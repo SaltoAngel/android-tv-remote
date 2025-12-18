@@ -1,0 +1,53 @@
+app-id: io.github.erens.GnomeAndroidTvRemote
+runtime: org.gnome.Platform
+runtime-version: "47"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.python3
+command: gnome-adb-tv-remote
+
+finish-args:
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+
+build-options:
+  append-path: /usr/lib/sdk/python3/bin
+  append-ld-library-path: /usr/lib/sdk/python3/lib
+  env:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_NO_CACHE_DIR: "1"
+    PYTHONNOUSERSITE: "1"
+
+modules:
+  - name: python3-psutil
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app --no-deps --no-build-isolation psutil-5.9.8.tar.gz
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/90/c7/6dc0a455d111f68ee43f27793971cf03fe29b6ef972042549db29eec39a2/psutil-5.9.8.tar.gz
+        sha256: 6be126e3225486dff286a8fb9a06246a5253f4c7c53b475ea5f5ac934e64194c
+
+  - name: python3-adb-shell
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app --no-deps --no-build-isolation adb_shell-0.4.4.tar.gz
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/8f/73/d246034db6f3e374dad9a35ee3f61345a6b239d4febd2a41ab69df9936fe/adb_shell-0.4.4.tar.gz
+        sha256: 04c305f30a2ca25d5c54b3cd6ce9bb64c36e5f07967b23b3fb6aaecc851b90b6
+
+  - name: gnome-adb-tv-remote
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app --no-deps --no-build-isolation .
+      - install -D data/io.github.erens.GnomeAndroidTvRemote.desktop /app/share/applications/io.github.erens.GnomeAndroidTvRemote.desktop
+      - install -D data/io.github.erens.GnomeAndroidTvRemote.metainfo.xml /app/share/metainfo/io.github.erens.GnomeAndroidTvRemote.metainfo.xml
+      - install -D data/icons/hicolor/scalable/apps/io.github.erens.GnomeAndroidTvRemote.svg /app/share/icons/hicolor/scalable/apps/io.github.erens.GnomeAndroidTvRemote.svg
+    sources:
+      - type: dir
+        path: ..
+
+

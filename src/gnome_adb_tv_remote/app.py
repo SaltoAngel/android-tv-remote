@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+
+from gi.repository import Adw, Gio, GLib  # noqa: E402
+
+from .ui.main_window import MainWindow  # noqa: E402
+
+
+APP_ID = "io.github.erens.GnomeAndroidTvRemote"
+
+
+class App(Adw.Application):
+    def __init__(self) -> None:
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+
+        self._create_actions()
+
+    def _create_actions(self) -> None:
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", lambda *_: self.quit())
+        self.add_action(quit_action)
+        self.set_accels_for_action("app.quit", ["<primary>q"])
+
+    def do_activate(self) -> None:  # type: ignore[override]
+        win = self.props.active_window
+        if not win:
+            win = MainWindow(application=self)
+        win.present()
+
+
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv
+
+    Adw.init()
+    app = App()
+    return int(app.run(argv))
+
+
