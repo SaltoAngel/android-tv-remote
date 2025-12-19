@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import ipaddress
 import threading
 from typing import TYPE_CHECKING
@@ -32,8 +33,10 @@ class DeviceDialog(Adw.Window):
         self._scan_cancel: threading.Event | None = None
         self._scan_thread: threading.Thread | None = None
         self._found_ips: set[str] = set()
+        self._discovered_devices: list[dict[str, str | float]] = []
 
         self._build_ui()
+        self._load_discovered_devices()
         self.connect("close-request", self._on_close_request)
 
     def _on_close_request(self, *_args) -> bool:
@@ -45,6 +48,26 @@ class DeviceDialog(Adw.Window):
         last_ip = self._parent._settings.get_string("last-connected-ip")
         if last_ip:
             self._ip_entry.set_text(last_ip)
+
+    def _load_discovered_devices(self) -> None:
+        """Load previously discovered devices from settings."""
+        json_data = self._parent._settings.get_string("discovered-devices")
+        if not json_data:
+            return
+        try:
+            devices = json.loads(json_data)
+            for device in devices:
+                ip = device.get("ip")
+                latency = device.get("latency_ms", 0.0)
+                if ip:
+                    self._on_scan_found_ui(ip, latency, save=False)
+        except Exception:
+            pass
+
+    def _save_discovered_devices(self) -> None:
+        """Save currently found devices to settings."""
+        json_data = json.dumps(self._discovered_devices)
+        self._parent._settings.set_string("discovered-devices", json_data)
 
     def _build_ui(self) -> None:
         toolbar_view = Adw.ToolbarView()
@@ -131,6 +154,8 @@ class DeviceDialog(Adw.Window):
         while child := self._device_list.get_first_child():
             self._device_list.remove(child)
         self._found_ips.clear()
+        self._discovered_devices.clear()
+        self._save_discovered_devices()
 
         nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
         if not nets:
@@ -175,10 +200,14 @@ class DeviceDialog(Adw.Window):
         self._scan_progress.set_fraction(frac)
         self._scan_progress.set_text(f"Scanning {scanned}/{total}")
 
-    def _on_scan_found_ui(self, ip: str, latency_ms: float) -> None:
+    def _on_scan_found_ui(self, ip: str, latency_ms: float, save: bool = True) -> None:
         if ip in self._found_ips:
             return
         self._found_ips.add(ip)
+
+        if save:
+            self._discovered_devices.append({"ip": ip, "latency_ms": latency_ms})
+            self._save_discovered_devices()
 
         row = Adw.ActionRow(title=ip, subtitle=f"Port 5555 open ({latency_ms:.0f} ms)")
 
