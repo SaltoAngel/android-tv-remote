@@ -230,22 +230,45 @@ class ScrcpyServerController:
 
     def _start_server(self) -> None:
         """Start scrcpy-server on the device."""
-        # We start the server in the background on the device using &
-        # This avoids blocking the adb_shell connection.
-        # Arguments for v3.1: tunnel_forward=true means it listens on device abstract socket 'scrcpy'
-        server_cmd = (
-            f"CLASSPATH={self.DEVICE_SERVER_PATH} "
-            f"app_process / com.genymobile.scrcpy.Server {self.SCRCPY_VERSION} "
-            "tunnel_forward=true video=false audio=false control=true "
-            "cleanup=true power_off_on_close=false"
-        )
+        # We use the adb CLI to start the server in a way that we can keep it alive.
+        # We need to set ADB_VENDOR_KEYS so the CLI is authorized.
+        from .keystore import get_adb_key_paths
+        keys = get_adb_key_paths()
+        env = os.environ.copy()
+        env["ADB_VENDOR_KEYS"] = str(keys.private_key)
+        
+        adb = self._find_adb()
+        
+        # Ensure CLI is connected
+        subprocess.run([adb, "connect", f"{self._host}:{self._port}"], capture_output=True, env=env, timeout=5)
 
-        logger.info("Starting scrcpy-server on device")
-        # Run in background on device so adb_shell.shell() returns immediately
-        self._adb.shell(f"{server_cmd} > /dev/null 2>&1 &")
+        # Arguments for v3.1: tunnel_forward=true means it listens on device abstract socket 'scrcpy'
+        # We don't background with '&' here; we use Popen to keep it alive as a child process.
+        server_cmd = [
+            adb, "-s", f"{self._host}:{self._port}", "shell",
+            f"CLASSPATH={self.DEVICE_SERVER_PATH}", "app_process", "/", "com.genymobile.scrcpy.Server",
+            self.SCRCPY_VERSION,
+            "tunnel_forward=true", "video=false", "audio=false", "control=true",
+            "cleanup=true", "power_off_on_close=false", "log_level=warn"
+        ]
+
+        logger.info(f"Starting scrcpy-server on device: {' '.join(server_cmd)}")
+        self._shell_process = subprocess.Popen(
+            server_cmd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+        )
         
         # Give the server a moment to start and create its socket
-        time.sleep(1.2)
+        time.sleep(1.5)
+        
+        # Check if it crashed immediately
+        if self._shell_process.poll() is not None:
+            err = self._shell_process.stderr.read().decode() if self._shell_process.stderr else "Unknown error"
+            raise ScrcpyError(f"scrcpy-server exited immediately: {err}")
+            
         self._server_started = True
 
     def _setup_connection(self) -> None:
@@ -253,16 +276,22 @@ class ScrcpyServerController:
         # Find a free local port
         self._forward_port = self._find_free_port()
 
-        # Setup port forwarding using the adb CLI (it's the easiest way for port forwarding).
-        # We run 'adb connect' first to make sure the CLI sees the device.
-        adb = self._find_adb()
-        subprocess.run([adb, "connect", f"{self._host}:{self._port}"], capture_output=True, timeout=5)
+        # Setup port forwarding using the adb CLI.
+        from .keystore import get_adb_key_paths
+        keys = get_adb_key_paths()
+        env = os.environ.copy()
+        env["ADB_VENDOR_KEYS"] = str(keys.private_key)
         
-        # Now run the forward command
-        subprocess.run([
+        adb = self._find_adb()
+        
+        # Setup the forward
+        result = subprocess.run([
             adb, "-s", f"{self._host}:{self._port}",
             "forward", f"tcp:{self._forward_port}", "localabstract:scrcpy"
-        ], capture_output=True, timeout=5)
+        ], capture_output=True, env=env, timeout=5)
+        
+        if result.returncode != 0:
+            raise ScrcpyError(f"Failed to setup port forward: {result.stderr.decode()}")
 
         # Give forwarding a moment to establish
         time.sleep(0.5)
