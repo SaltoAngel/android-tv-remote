@@ -3,9 +3,10 @@ from __future__ import annotations
 import gi
 
 gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 
 class RemotePanel(Gtk.Box):
@@ -50,16 +51,16 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, tooltip="Space")
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5, tooltip="A")
 
-        text_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self._text_entry = Gtk.Entry(placeholder_text="Type text to send…")
-        self._text_entry.connect("activate", lambda *_: self._send_text())
-
-        send_btn = Gtk.Button(label="Send")
-        send_btn.add_css_class("suggested-action")
-        send_btn.connect("clicked", lambda *_: self._send_text())
-        text_row.append(self._text_entry)
-        text_row.append(send_btn)
-        self.append(text_row)
+        # Text input field - keystrokes are sent directly to Android TV
+        self._text_entry = Gtk.Entry(placeholder_text="Type to send (Esc to exit)…")
+        self._text_entry.set_hexpand(True)
+        
+        # Add key controller to capture keystrokes
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_entry_key_pressed)
+        self._text_entry.add_controller(key_controller)
+        
+        self.append(self._text_entry)
 
     def set_handlers(self, *, on_keyevent=None, on_text=None) -> None:
         self._on_keyevent = on_keyevent
@@ -74,13 +75,47 @@ class RemotePanel(Gtk.Box):
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
 
-    def _send_text(self) -> None:
-        text = self._text_entry.get_text()
-        if not text.strip():
-            return
-        self._text_entry.set_text("")
-        if self._on_text:
-            self._on_text(text)
+    def _on_entry_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, state: Gdk.ModifierType) -> bool:
+        """Handle keystrokes in the text entry - send them directly to Android TV."""
+        # Escape: return focus to the OK button (center of D-pad)
+        if keyval == Gdk.KEY_Escape:
+            ok_btn = self._keycode_buttons.get("KEYCODE_DPAD_CENTER")
+            if ok_btn:
+                ok_btn.grab_focus()
+            return True
+        
+        # Enter: send KEYCODE_DPAD_CENTER (OK/Enter on TV)
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            if self._on_keyevent:
+                self._on_keyevent("KEYCODE_DPAD_CENTER")
+            return True
+        
+        # Backspace: send KEYCODE_DEL to delete character on TV
+        if keyval == Gdk.KEY_BackSpace:
+            if self._on_keyevent:
+                self._on_keyevent("KEYCODE_DEL")
+            return True
+        
+        # Tab: send Tab keycode
+        if keyval == Gdk.KEY_Tab:
+            if self._on_keyevent:
+                self._on_keyevent("KEYCODE_TAB")
+            return True
+        
+        # Ignore modifier keys alone
+        if keyval in (Gdk.KEY_Shift_L, Gdk.KEY_Shift_R, Gdk.KEY_Control_L, 
+                      Gdk.KEY_Control_R, Gdk.KEY_Alt_L, Gdk.KEY_Alt_R,
+                      Gdk.KEY_Super_L, Gdk.KEY_Super_R, Gdk.KEY_Caps_Lock):
+            return False
+        
+        # Convert keyval to character and send as text
+        char = chr(Gdk.keyval_to_unicode(keyval)) if Gdk.keyval_to_unicode(keyval) else None
+        if char and char.isprintable():
+            if self._on_text:
+                self._on_text(char)
+            return True
+        
+        return False
 
     def flash_button(self, keycode: str) -> None:
         """Flash the button corresponding to the keycode to show visual feedback.
