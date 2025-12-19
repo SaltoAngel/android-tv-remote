@@ -1,0 +1,36 @@
+---
+description: Git commit at the end of each response
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Git Commit Rule
+
+At the end of each response, if changes were made to files, commit these changes with git.
+
+## Rules
+
+1. After making code or file changes, run `git add` and `git commit` commands at the end of the response
+2. Use conventional commits format (feat:, fix:, docs:, refactor:, chore:, etc.)
+3. Only commit when actual changes were made, do not commit when only reading or analysis was performed
+4. Update `README.md` accordingly
+5. When needed, make sure to edit .gitignore file
+
+# AI Context Rule
+
+Save important context about the codebase for future AI sessions in `.cursor/context.md`.
+
+## Rules
+
+1. When significant architectural decisions, patterns, or conventions are established, append them to `.cursor/context.md`
+2. If `.cursor/context.md` does not exist, create it with a header
+3. Save context about:
+   - Project architecture and design patterns
+   - Key dependencies and their purposes
+   - Important conventions or coding standards used
+   - Complex logic that requires explanation
+   - Known issues or limitations
+4. Keep entries concise and actionable
+5. Use markdown headers to organize sections (e.g., `## Architecture`, `## Dependencies`)
+6. Include timestamps when adding new context entries
+7. Commit context file changes along with related code changes
