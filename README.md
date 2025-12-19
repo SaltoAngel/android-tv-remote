@@ -30,11 +30,6 @@ GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 55
 3. Accept authorization prompt on first connect
 
 ### Development
-**Local run:**
-```bash
-python3 -m gnome_adb_tv_remote
-```
-
 **Flatpak build:**
 ```bash
 flatpak-builder --user --install --force-clean build-dir flatpak/io.github.AndroidTvRemote.yml
