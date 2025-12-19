@@ -105,6 +105,10 @@ class AdbTcpClient:
             version=version or "Unknown",
         )
 
+    @property
+    def device(self):
+        return self._device
+
     def shell(self, command: str) -> ShellResult:
         dev = self._device
         if not dev:

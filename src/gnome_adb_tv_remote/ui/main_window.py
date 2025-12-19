@@ -231,13 +231,14 @@ class MainWindow(Adw.ApplicationWindow):
         This uses direct communication with scrcpy-server on the device,
         which means NO WINDOW is opened - all control happens in the background.
         """
-        def worker():
-            try:
-                scrcpy = ScrcpyServerController(ip, port=5555)
-                scrcpy.set_disconnect_handler(
-                    lambda: GLib.idle_add(self._on_scrcpy_disconnected)
-                )
-                scrcpy.connect()
+            def worker():
+                try:
+                    # Pass the AdbTcpClient instance
+                    scrcpy = ScrcpyServerController(self._adb)
+                    scrcpy.set_disconnect_handler(
+                        lambda: GLib.idle_add(self._on_scrcpy_disconnected)
+                    )
+                    scrcpy.connect()
                 GLib.idle_add(self._on_scrcpy_connected, scrcpy)
             except ScrcpyError as e:
                 logger.warning(f"scrcpy-server connection failed: {e}, using ADB shell fallback")
