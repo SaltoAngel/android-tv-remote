@@ -91,7 +91,9 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar_view.set_content(self._remote_panel)
 
         # Keyboard shortcuts controller
+        # Use CAPTURE phase to catch keys before they're consumed by focused widgets
         key_controller = Gtk.EventControllerKey()
+        key_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_controller.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_controller)
 
@@ -289,12 +291,14 @@ class MainWindow(Adw.ApplicationWindow):
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
 
+        # Handle keyboard shortcuts
         if keyval in self._key_map:
             keycode = self._key_map[keyval]
             # Flash the button to show visual feedback
             self._remote_panel.flash_button(keycode)
             # Send the key event
             self._on_remote_keyevent(keycode)
+            # Return True to stop event propagation (prevent default behavior)
             return True
         return False
 
