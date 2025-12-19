@@ -11,6 +11,8 @@ requires-python = ">=3.10"
 dependencies = [
   "adb-shell>=0.4.4",
   "psutil>=5.9.0",
+  "rsa>=4.9",
+  "pyasn1>=0.5.1",
 ]
 
 [project.scripts]
