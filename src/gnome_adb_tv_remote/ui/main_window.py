@@ -90,7 +90,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Content (remote)
         self._remote_panel = RemotePanel()
-        split.set_content(self._remote_panel)
+        remote_page = Adw.NavigationPage(title="Remote", child=self._remote_panel)
+        split.set_content(remote_page)
 
         self._set_connected(False)
 
