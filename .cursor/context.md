@@ -24,6 +24,7 @@
 ## Features
 - [2025-12-19] Last connected IP address is remembered using GSettings and automatically connected to when the app opens. The IP is saved to `last-connected-ip` key in the GSettings schema when a connection succeeds. Auto-connection happens asynchronously after UI initialization using `GLib.idle_add`.
 - [2025-12-19] Connected device info (manufacturer, model, and Android version) is retrieved via `getprop` and displayed in the `RemotePanel` title/subtitle area upon successful connection.
+- [2025-12-19] Keyboard shortcuts implemented globally in `MainWindow` using `Gtk.EventControllerKey`. Navigation, media controls, and system keys are mapped to ADB keycodes. Shortcuts are automatically disabled when a text entry is focused.
 
 ## Known Issues
 - [2025-12-19] Fixed Apps button functionality. Changed from `KEYCODE_APP_SWITCH` (Recents) to `KEYCODE_ALL_APPS` (App Drawer) as it is more commonly expected for an "Apps" button on Android TV remotes.

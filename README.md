@@ -7,8 +7,21 @@ GNOME (Libadwaita) desktop app to **scan your LAN for Android TVs**, connect ove
 - **Connect**: pure-Python ADB client (no external `adb` binary) with on-device authorization.
 - **Auto-connect**: automatically remembers and connects to the last successfully connected IP address when the app opens.
 - **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, apps list, and text input.
+- **Keyboard Shortcuts**: control your TV with your laptop keyboard (arrows, Enter, Backspace, etc.).
 
-### Android TV setup
+### Keyboard Shortcuts
+| Key | Action |
+| --- | --- |
+| **Arrows** | Navigate (Up/Down/Left/Right) |
+| **Enter** | Select / OK |
+| **Backspace / Esc** | Back |
+| **Home** | Home |
+| **Space** | Play / Pause |
+| **M** | Menu |
+| **P** | Power |
+| **A** | All Apps |
+| **+ / .** | Volume Up |
+| **- / ,** | Volume Down |
 1. Enable **Developer options** on the TV.
 2. Enable **USB debugging** (or **ADB debugging** / **Wireless debugging**, depending on vendor/Android version).
 3. Ensure ADB over network is available on **port 5555**.

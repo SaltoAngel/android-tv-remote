@@ -7,8 +7,9 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient  # noqa: E402
 from .device_dialog import DeviceDialog  # noqa: E402
@@ -25,6 +26,29 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
+
+        # Key mapping: Gdk keyval -> ADB keycode
+        self._key_map = {
+            Gdk.KEY_Up: "KEYCODE_DPAD_UP",
+            Gdk.KEY_Down: "KEYCODE_DPAD_DOWN",
+            Gdk.KEY_Left: "KEYCODE_DPAD_LEFT",
+            Gdk.KEY_Right: "KEYCODE_DPAD_RIGHT",
+            Gdk.KEY_Return: "KEYCODE_DPAD_CENTER",
+            Gdk.KEY_KP_Enter: "KEYCODE_DPAD_CENTER",
+            Gdk.KEY_BackSpace: "KEYCODE_BACK",
+            Gdk.KEY_Escape: "KEYCODE_BACK",
+            Gdk.KEY_Home: "KEYCODE_HOME",
+            Gdk.KEY_Menu: "KEYCODE_MENU",
+            Gdk.KEY_space: "KEYCODE_MEDIA_PLAY_PAUSE",
+            Gdk.KEY_plus: "KEYCODE_VOLUME_UP",
+            Gdk.KEY_equal: "KEYCODE_VOLUME_UP",
+            Gdk.KEY_minus: "KEYCODE_VOLUME_DOWN",
+            Gdk.KEY_period: "KEYCODE_VOLUME_UP",
+            Gdk.KEY_comma: "KEYCODE_VOLUME_DOWN",
+            Gdk.KEY_p: "KEYCODE_POWER",
+            Gdk.KEY_m: "KEYCODE_MENU",
+            Gdk.KEY_a: "KEYCODE_ALL_APPS",
+        }
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erens.GnomeAndroidTvRemote")
@@ -56,6 +80,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Content (remote)
         self._remote_panel = RemotePanel()
         toolbar_view.set_content(self._remote_panel)
+
+        # Keyboard shortcuts controller
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
 
         self._set_connected(False)
 
@@ -186,6 +215,18 @@ class MainWindow(Adw.ApplicationWindow):
             self._adb = None
         self._set_connected(False)
         self._toast("Disconnected")
+
+    def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
+        """Handle global keyboard shortcuts."""
+        # If an entry/editable is focused, don't intercept keys to allow normal typing
+        focus = self.get_focus()
+        if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
+            return False
+
+        if keyval in self._key_map:
+            self._on_remote_keyevent(self._key_map[keyval])
+            return True
+        return False
 
     def _on_remote_keyevent(self, keycode: str) -> None:
         client = self._adb
