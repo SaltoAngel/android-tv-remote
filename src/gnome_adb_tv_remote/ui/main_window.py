@@ -28,6 +28,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._found_ips: set[str] = set()
         self._adb: AdbTcpClient | None = None
         self._connect_thread: threading.Thread | None = None
+        self._connect_silent: bool = False
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erens.GnomeAndroidTvRemote")
@@ -116,7 +117,7 @@ class MainWindow(Adw.ApplicationWindow):
         """
         # Only auto-connect if the IP entry still has this value (user hasn't changed it)
         if self._ip_entry.get_text().strip() == ip:
-            self.activate_action("win.connect_ip", None)
+            self._connect_ip(silent=True)
         return False
 
     def _save_last_ip(self, ip: str) -> None:
@@ -224,19 +225,31 @@ class MainWindow(Adw.ApplicationWindow):
             self._toast(f"Scan finished ({len(self._found_ips)} found)")
 
     def _on_connect_ip(self, *_args) -> None:
+        """Handler for the connect_ip action (user-initiated)."""
+        self._connect_ip(silent=False)
+
+    def _connect_ip(self, *, silent: bool = False) -> None:
+        """Connect to the IP address in the entry field.
+        
+        Args:
+            silent: If True, suppress "Connecting..." notification (for auto-connect).
+        """
         ip = self._ip_entry.get_text().strip()
         if not ip:
-            self._toast("Enter an IP address")
+            if not silent:
+                self._toast("Enter an IP address")
             return
 
         try:
             ipaddress.ip_address(ip)
         except ValueError:
-            self._toast("Invalid IP address")
+            if not silent:
+                self._toast("Invalid IP address")
             return
 
         if self._connect_thread:
-            self._toast("Already connecting…")
+            if not silent:
+                self._toast("Already connecting…")
             return
 
         # If already connected to another device, disconnect first.
@@ -248,7 +261,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._adb = None
             self._set_connected(False)
 
-        self._toast(f"Connecting to {ip}:5555…")
+        if not silent:
+            self._toast(f"Connecting to {ip}:5555…")
+        self._connect_silent = silent
         client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
 
         def worker() -> None:
@@ -276,7 +291,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._adb = client
         self._set_connected(True, ip=ip)
         self._save_last_ip(ip)
-        self._toast(f"Connected to {ip}")
+        if not self._connect_silent:
+            self._toast(f"Connected to {ip}")
+        self._connect_silent = False
 
     def _on_connect_failed_ui(self, msg: str) -> None:
         self._adb = None
