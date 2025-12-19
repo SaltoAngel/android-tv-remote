@@ -18,6 +18,17 @@ build-options:
     PYTHONNOUSERSITE: "1"
 
 modules:
+  # Android Platform Tools (adb) - required by scrcpy
+  - name: android-tools
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 platform-tools/adb /app/bin/adb
+    sources:
+      - type: archive
+        url: https://dl.google.com/android/repository/platform-tools_r35.0.2-linux.zip
+        sha256: acfdcccb123a8718c46c46c059b2f621140194e5ec1ac9d81715be3d6ab6cd0a
+        strip-components: 0
+
   # libusb for USB device access
   - name: libusb
     buildsystem: autotools
@@ -27,7 +38,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
-        sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879571c6f8e9166f8e4e0da80391
+        sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575
 
   # FFmpeg (minimal build for scrcpy)
   - name: ffmpeg
@@ -48,9 +59,20 @@ modules:
     sources:
       - type: archive
         url: https://ffmpeg.org/releases/ffmpeg-7.0.2.tar.xz
-        sha256: 8646515b638a3ad303e23af6a3f068e621ec2d498f1d07a82e356f4b5a29b2a0
+        sha256: 8646515b638a3ad303e23af6a3587734447cb8fc0a0c064ecdb8e95c4fd8b389
     cleanup:
       - /share/ffmpeg
+
+  # scrcpy-server (pre-built, must be installed before scrcpy build)
+  - name: scrcpy-server
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 scrcpy-server /app/share/scrcpy/scrcpy-server
+    sources:
+      - type: file
+        url: https://github.com/Genymobile/scrcpy/releases/download/v3.1/scrcpy-server-v3.1
+        sha256: 958f0944a62f23b1f33a16e9eb14844c1a04b882ca175a738c16d23cb22b86c0
+        dest-filename: scrcpy-server
 
   # scrcpy for low-latency input injection
   - name: scrcpy
@@ -61,15 +83,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/Genymobile/scrcpy/archive/refs/tags/v3.1.tar.gz
-        sha256: c4c5bbb2fd63e3c6b4ccd28f4dcb1138a6b8d8c4a1ad13e6dc14582c55e86c15
-        dest: scrcpy-src
-      - type: file
-        url: https://github.com/Genymobile/scrcpy/releases/download/v3.1/scrcpy-server-v3.1
-        sha256: 5cc33a7bc8c1176c5be18a78a47f8e0e0ea4e7a033e3d8237d7f0ec7ce2fb42b
-        dest-filename: scrcpy-server
-    post-install:
-      - install -Dm644 scrcpy-server /app/share/scrcpy/scrcpy-server
-    subdir: scrcpy-src
+        sha256: beaa5050a3c45faa77cedc70ad13d88ef26b74d29d52f512b7708671e037d24d
   - name: python3-psutil
     buildsystem: simple
     build-commands:
