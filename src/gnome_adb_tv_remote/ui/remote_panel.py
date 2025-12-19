@@ -49,6 +49,8 @@ class RemotePanel(Gtk.Box):
 
         # Map keycode -> button for visual feedback
         self._keycode_buttons: dict[str, Gtk.Button] = {}
+        # Map keycode -> shortcut label for updating shortcuts
+        self._keycode_shortcut_labels: dict[str, Gtk.Label] = {}
 
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0)
@@ -91,14 +93,19 @@ class RemotePanel(Gtk.Box):
         self._on_text = on_text
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
-        """Update button tooltips based on current keyboard shortcuts."""
+        """Update button shortcut labels based on current keyboard shortcuts."""
         from .preferences_dialog import get_action_tooltip
         
-        for keycode, btn in self._keycode_buttons.items():
+        for keycode, shortcut_label in self._keycode_shortcut_labels.items():
             action = KEYCODE_TO_ACTION.get(keycode)
             if action:
-                tooltip = get_action_tooltip(action, settings)
-                btn.set_tooltip_text(tooltip if tooltip else None)
+                shortcut_text = get_action_tooltip(action, settings)
+                if shortcut_text:
+                    shortcut_label.set_text(shortcut_text)
+                    shortcut_label.set_visible(True)
+                else:
+                    shortcut_label.set_text("")
+                    shortcut_label.set_visible(False)
         
         # Update keyboard entry placeholder with focus shortcut
         focus_tooltip = get_action_tooltip("focus-keyboard", settings)
@@ -206,15 +213,36 @@ class RemotePanel(Gtk.Box):
         GLib.timeout_add(150, remove_flash)
 
     def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False) -> None:
-        btn = Gtk.Button(label=label)
+        # Create button
+        btn = Gtk.Button()
         if suggested:
             btn.add_css_class("suggested-action")
         btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
         btn.set_hexpand(True)
         btn.set_vexpand(True)
+        
+        # Create vertical box for label and shortcut
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.set_valign(Gtk.Align.CENTER)
+        
+        # Main label
+        main_label = Gtk.Label(label=label)
+        box.append(main_label)
+        
+        # Shortcut label (smaller, dimmed)
+        shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
+        shortcut_label.add_css_class("dim-label")
+        shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
+        box.append(shortcut_label)
+        
+        # Set box as button child
+        btn.set_child(box)
+        
         self._grid.attach(btn, col, row, 1, 1)
 
-        # Register button for visual feedback
+        # Register button and shortcut label for updates
         self._keycode_buttons[keycode] = btn
+        self._keycode_shortcut_labels[keycode] = shortcut_label
 
 
