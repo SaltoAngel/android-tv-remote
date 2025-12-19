@@ -85,7 +85,8 @@ class MainWindow(Adw.ApplicationWindow):
         device_frame.set_child(self._device_list)
         sidebar.append(device_frame)
 
-        split.set_sidebar(sidebar)
+        sidebar_page = Adw.NavigationPage(title="Devices", child=sidebar)
+        split.set_sidebar(sidebar_page)
 
         # Content (remote)
         self._remote_panel = RemotePanel()
