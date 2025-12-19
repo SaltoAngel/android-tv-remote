@@ -36,13 +36,13 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, tooltip="Arrow Down")
 
         # System
-        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, tooltip="Backspace / Esc")
+        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, tooltip="Esc")
         self._add_key_button("Home", "KEYCODE_HOME", 1, 3, tooltip="Home")
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, tooltip="M")
+        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, tooltip="Backspace")
 
         # Volume
         self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, tooltip="- or , or Numpad -")
-        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4)
+        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, tooltip="M")
         self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, tooltip="+ or . or Numpad +")
 
         # Power / Media

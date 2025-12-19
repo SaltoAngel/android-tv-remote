@@ -44,7 +44,7 @@ class MainWindow(Adw.ApplicationWindow):
             Gdk.KEY_Right: "KEYCODE_DPAD_RIGHT",
             Gdk.KEY_Return: "KEYCODE_DPAD_CENTER",
             Gdk.KEY_KP_Enter: "KEYCODE_DPAD_CENTER",
-            Gdk.KEY_BackSpace: "KEYCODE_BACK",
+            Gdk.KEY_BackSpace: "KEYCODE_MENU",
             Gdk.KEY_Escape: "KEYCODE_BACK",
             Gdk.KEY_Home: "KEYCODE_HOME",
             Gdk.KEY_Menu: "KEYCODE_MENU",
@@ -57,7 +57,7 @@ class MainWindow(Adw.ApplicationWindow):
             Gdk.KEY_period: "KEYCODE_VOLUME_UP",
             Gdk.KEY_comma: "KEYCODE_VOLUME_DOWN",
             Gdk.KEY_p: "KEYCODE_POWER",
-            Gdk.KEY_m: "KEYCODE_MENU",
+            Gdk.KEY_m: "KEYCODE_VOLUME_MUTE",
             Gdk.KEY_a: "KEYCODE_ALL_APPS",
         }
 
