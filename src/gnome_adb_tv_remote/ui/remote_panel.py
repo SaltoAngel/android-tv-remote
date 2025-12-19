@@ -52,15 +52,23 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5, tooltip="A")
 
         # Text input field - keystrokes are sent directly to Android TV
-        self._text_entry = Gtk.Entry(placeholder_text="Type to send (Esc to exit)…")
+        # Using a Label styled as entry to avoid Entry's special key handling
+        self._text_entry = Gtk.Label(label="Type to send (Esc to exit)…")
         self._text_entry.set_hexpand(True)
-        self._text_entry.set_editable(False)  # Don't show typed text locally
+        self._text_entry.set_focusable(True)
+        self._text_entry.add_css_class("dim-label")
+        self._text_entry.set_xalign(0)
         
-        # Add key controller with CAPTURE phase to intercept before Entry processes
+        # Add key controller to capture keystrokes
         key_controller = Gtk.EventControllerKey()
-        key_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_controller.connect("key-pressed", self._on_entry_key_pressed)
         self._text_entry.add_controller(key_controller)
+        
+        # Add focus styling
+        focus_controller = Gtk.EventControllerFocus()
+        focus_controller.connect("enter", lambda *_: self._text_entry.remove_css_class("dim-label"))
+        focus_controller.connect("leave", lambda *_: self._text_entry.add_css_class("dim-label"))
+        self._text_entry.add_controller(focus_controller)
         
         self.append(self._text_entry)
 
