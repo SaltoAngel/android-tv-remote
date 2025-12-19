@@ -18,14 +18,14 @@ class AdbKeyPaths:
     public_key: Path
 
 
-def _config_dir(app_dir_name: str = "gnome-adb-tv-remote") -> Path:
+def _config_dir(app_dir_name: str = "android-tv-remote") -> Path:
     xdg = os.environ.get("XDG_CONFIG_HOME")
     if xdg:
         return Path(xdg) / app_dir_name
     return Path.home() / ".config" / app_dir_name
 
 
-def get_adb_key_paths(app_dir_name: str = "gnome-adb-tv-remote") -> AdbKeyPaths:
+def get_adb_key_paths(app_dir_name: str = "android-tv-remote") -> AdbKeyPaths:
     base = _config_dir(app_dir_name) / "adb"
     return AdbKeyPaths(private_key=base / "adbkey", public_key=base / "adbkey.pub")
 
@@ -158,7 +158,7 @@ def _generate_adb_keypair(private_key_path: str) -> None:
         f.write(_get_user_info().encode())
 
 
-def ensure_adb_keys_exist(app_dir_name: str = "gnome-adb-tv-remote") -> AdbKeyPaths:
+def ensure_adb_keys_exist(app_dir_name: str = "android-tv-remote") -> AdbKeyPaths:
     """Ensure ADB RSA keypair exists and return paths.
 
     Keys are stored inside the Flatpak sandbox under XDG config.

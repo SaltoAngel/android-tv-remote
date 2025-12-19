@@ -2,7 +2,7 @@ app-id: io.github.AndroidTvRemote
 runtime: org.gnome.Platform
 runtime-version: "48"
 sdk: org.gnome.Sdk
-command: gnome-adb-tv-remote
+command: android-tv-remote
 
 finish-args:
   - --share=network
@@ -75,7 +75,7 @@ modules:
         url: https://files.pythonhosted.org/packages/64/8d/0133e4eb4beed9e425d9a98ed6e081a55d195481b7632472be1af08d2f6b/rsa-4.9.1-py3-none-any.whl
         sha256: 68635866661c6836b8d39430f97a996acbd61bfa49406748ea243539fe239762
 
-  - name: gnome-adb-tv-remote
+  - name: android-tv-remote
     buildsystem: simple
     build-commands:
       - pip3 install --prefix=/app --no-deps --no-build-isolation .
