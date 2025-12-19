@@ -54,13 +54,8 @@ class RemotePanel(Gtk.Box):
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Press K to focus keyboard")
         self._keyboard_entry.set_hexpand(True)
+        self._keyboard_entry.set_editable(False)  # Disable text input, we handle keys manually
         self._keyboard_focused = False
-        
-        # Add key controller with CAPTURE phase to intercept before Entry processes
-        key_controller = Gtk.EventControllerKey()
-        key_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        key_controller.connect("key-pressed", self._on_keyboard_key_pressed)
-        self._keyboard_entry.add_controller(key_controller)
         
         # Add focus state tracking
         focus_controller = Gtk.EventControllerFocus()
@@ -102,8 +97,11 @@ class RemotePanel(Gtk.Box):
         """Focus the keyboard input area."""
         self._keyboard_entry.grab_focus()
 
-    def _on_keyboard_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, state: Gdk.ModifierType) -> bool:
-        """Handle keystrokes in keyboard mode - send them directly to Android TV."""
+    def handle_keyboard_key(self, keyval: int) -> bool:
+        """Handle keystrokes in keyboard mode - send them directly to Android TV.
+        
+        Called by MainWindow when keyboard is focused. Returns True if key was handled.
+        """
         # Escape: return focus to the OK button (center of D-pad)
         if keyval == Gdk.KEY_Escape:
             ok_btn = self._keycode_buttons.get("KEYCODE_DPAD_CENTER")
@@ -121,6 +119,12 @@ class RemotePanel(Gtk.Box):
         if keyval == Gdk.KEY_BackSpace:
             if self._on_keyevent:
                 self._on_keyevent("KEYCODE_DEL")
+            return True
+        
+        # Delete key: also send KEYCODE_DEL
+        if keyval == Gdk.KEY_Delete:
+            if self._on_keyevent:
+                self._on_keyevent("KEYCODE_FORWARD_DEL")
             return True
         
         # Tab: send Tab keycode

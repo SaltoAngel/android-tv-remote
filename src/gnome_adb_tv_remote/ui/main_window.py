@@ -288,11 +288,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
-        # If keyboard input mode is active, let RemotePanel handle all keys
+        # If keyboard input mode is active, handle keys here (before Entry can consume them)
         if self._remote_panel.keyboard_focused:
-            return False
+            return self._remote_panel.handle_keyboard_key(keyval)
 
-        # If an entry/editable is focused, don't intercept keys to allow normal typing
+        # If an entry/editable is focused (e.g., in DeviceDialog), don't intercept keys
         focus = self.get_focus()
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
