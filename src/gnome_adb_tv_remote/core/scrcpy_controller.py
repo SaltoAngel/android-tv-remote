@@ -41,30 +41,42 @@ SC_CONTROL_MSG_TYPE_ROTATE_DEVICE = 11
 AKEY_EVENT_ACTION_DOWN = 0
 AKEY_EVENT_ACTION_UP = 1
 
-# Android keycodes (subset for TV remote)
+# Android keycodes (subset for TV remote + keyboard input)
 AKEYCODE_MAP = {
+    # Navigation
     "KEYCODE_DPAD_UP": 19,
     "KEYCODE_DPAD_DOWN": 20,
     "KEYCODE_DPAD_LEFT": 21,
     "KEYCODE_DPAD_RIGHT": 22,
     "KEYCODE_DPAD_CENTER": 23,
+    # System
     "KEYCODE_BACK": 4,
     "KEYCODE_HOME": 3,
     "KEYCODE_MENU": 82,
+    # Volume
     "KEYCODE_VOLUME_UP": 24,
     "KEYCODE_VOLUME_DOWN": 25,
     "KEYCODE_VOLUME_MUTE": 164,
+    # Power
     "KEYCODE_POWER": 26,
+    # Media
     "KEYCODE_MEDIA_PLAY_PAUSE": 85,
     "KEYCODE_MEDIA_STOP": 86,
     "KEYCODE_MEDIA_NEXT": 87,
     "KEYCODE_MEDIA_PREVIOUS": 88,
     "KEYCODE_MEDIA_REWIND": 89,
     "KEYCODE_MEDIA_FAST_FORWARD": 90,
+    # Apps
     "KEYCODE_ALL_APPS": 284,
     "KEYCODE_TV": 170,
     "KEYCODE_TV_INPUT": 178,
+    # Keyboard input
     "KEYCODE_ENTER": 66,
+    "KEYCODE_DEL": 67,  # Backspace
+    "KEYCODE_FORWARD_DEL": 112,  # Delete
+    "KEYCODE_TAB": 61,
+    "KEYCODE_SPACE": 62,
+    "KEYCODE_ESCAPE": 111,
 }
 
 
