@@ -34,6 +34,17 @@ class DeviceDialog(Adw.Window):
         self._found_ips: set[str] = set()
 
         self._build_ui()
+        self.connect("close-request", self._on_close_request)
+
+    def _on_close_request(self, *_args) -> bool:
+        self.hide()
+        return True
+
+    def update_last_ip(self) -> None:
+        """Refresh the IP entry with the last connected IP from settings."""
+        last_ip = self._parent._settings.get_string("last-connected-ip")
+        if last_ip:
+            self._ip_entry.set_text(last_ip)
 
     def _build_ui(self) -> None:
         toolbar_view = Adw.ToolbarView()

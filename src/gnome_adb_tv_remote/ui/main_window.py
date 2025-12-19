@@ -24,6 +24,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._adb: AdbTcpClient | None = None
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
+        self._device_dialog: DeviceDialog | None = None
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erens.GnomeAndroidTvRemote")
@@ -59,8 +60,11 @@ class MainWindow(Adw.ApplicationWindow):
         self._set_connected(False)
 
     def _on_devices_clicked(self, *_args) -> None:
-        dialog = DeviceDialog(self)
-        dialog.present()
+        if self._device_dialog is None:
+            self._device_dialog = DeviceDialog(self)
+        else:
+            self._device_dialog.update_last_ip()
+        self._device_dialog.present()
 
     def _auto_connect_last_ip(self) -> None:
         """Load the last successfully connected IP address from settings and auto-connect."""
