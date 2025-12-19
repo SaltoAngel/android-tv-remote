@@ -293,6 +293,13 @@ class MainWindow(Adw.ApplicationWindow):
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
 
+        # Handle "K" key to focus text input field
+        if keyval == Gdk.KEY_k:
+            text_entry = self._remote_panel._text_entry
+            if text_entry:
+                text_entry.grab_focus()
+            return True
+
         # Handle keyboard shortcuts
         if keyval in self._key_map:
             keycode = self._key_map[keyval]
