@@ -1,57 +1,45 @@
-## Android TV Remote for GNOME (Flatpak)
+## Android TV Remote for GNOME
 
-GNOME (Libadwaita) desktop app to **scan your LAN for Android TVs**, connect over **ADB TCP (port 5555)**, and control them with an on-screen remote.
+GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 5555), and control with an on-screen remote.
 
-### Features (current)
-- **Scan**: discovers private IPv4 /24 networks from your active interfaces and scans for hosts with TCP **5555** open.
-- **Connect**: pure-Python ADB client (no external `adb` binary) with on-device authorization.
-- **Auto-connect**: automatically remembers and connects to the last successfully connected IP address when the app opens.
-- **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, apps list, and text input.
-- **Keyboard Shortcuts**: control your TV with your laptop keyboard (arrows, Enter, Backspace, etc.).
-- **Low-Latency Input**: uses scrcpy when available for ~35-70ms input latency (vs ~200-500ms with ADB shell commands).
+### Features
+- **Scan**: Auto-discovers private IPv4 /24 networks and scans for hosts with TCP 5555 open
+- **Connect**: Pure-Python ADB client with on-device authorization
+- **Auto-connect**: Remembers and connects to last successful IP on startup
+- **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, apps list, text input
+- **Keyboard Shortcuts**: Control TV with keyboard (see table below)
+- **Low-Latency Input**: Uses scrcpy (~35-70ms) when available, falls back to ADB shell (~200-500ms)
 
 ### Keyboard Shortcuts
 | Key | Action |
 | --- | --- |
-| **Arrows** | Navigate (Up/Down/Left/Right) |
-| **Enter** | Select / OK |
-| **Backspace / Esc** | Back |
-| **Home** | Home |
-| **Space** | Play / Pause |
-| **M** | Menu |
-| **P** | Power |
-| **A** | All Apps |
-| **+ / .** | Volume Up |
-| **- / ,** | Volume Down |
-1. Enable **Developer options** on the TV.
-2. Enable **USB debugging** (or **ADB debugging** / **Wireless debugging**, depending on vendor/Android version).
-3. Ensure ADB over network is available on **port 5555**.
-   - Some TVs expose this directly.
-   - Others require running `adb tcpip 5555` once from a USB-connected ADB session.
-4. On first connect, **accept the authorization prompt** on the TV (“Allow USB debugging?”).
+| Arrows | Navigate |
+| Enter | Select/OK |
+| Backspace/Esc | Back |
+| Home | Home |
+| Space | Play/Pause |
+| M | Menu |
+| P | Power |
+| A | All Apps |
+| +/. | Volume Up |
+| -, | Volume Down |
 
-### Run locally (dev)
-This repo contains a GTK4/Libadwaita Python app under `src/gnome_adb_tv_remote/`.
+### Setup
+1. Enable **Developer options** and **USB/Wireless debugging** on TV
+2. Ensure ADB over network on **port 5555** (some TVs need `adb tcpip 5555` once via USB)
+3. Accept authorization prompt on first connect
 
-If your system Python has PyGObject (GTK4 + Libadwaita) available:
-
+### Development
+**Local run:**
 ```bash
 python3 -m gnome_adb_tv_remote
 ```
 
-### Flatpak
-The Flatpak manifest is:
-- `flatpak/io.github.erens.GnomeAndroidTvRemote.yml`
-
-Build/test locally (example):
-
+**Flatpak build:**
 ```bash
 flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erens.GnomeAndroidTvRemote.yml
 flatpak run io.github.erens.GnomeAndroidTvRemote
 ```
 
-### Dependencies (bundled in Flatpak)
-- **PyGObject**: GTK 4 and Libadwaita bindings
-- **adb-shell**: Pure Python ADB protocol implementation
-- **scrcpy**: Low-latency input injection (optional, falls back to ADB shell if unavailable)
-
+### Dependencies
+- PyGObject (GTK4/Libadwaita), adb-shell, scrcpy (optional)
