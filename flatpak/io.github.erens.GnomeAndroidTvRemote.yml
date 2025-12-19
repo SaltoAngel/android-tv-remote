@@ -2,8 +2,6 @@ app-id: io.github.erens.GnomeAndroidTvRemote
 runtime: org.gnome.Platform
 runtime-version: "48"
 sdk: org.gnome.Sdk
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.python3
 command: gnome-adb-tv-remote
 
 finish-args:
@@ -13,8 +11,6 @@ finish-args:
   - --device=dri
 
 build-options:
-  append-path: /usr/lib/sdk/python3/bin
-  append-ld-library-path: /usr/lib/sdk/python3/lib
   env:
     PIP_DISABLE_PIP_VERSION_CHECK: "1"
     PIP_NO_CACHE_DIR: "1"
