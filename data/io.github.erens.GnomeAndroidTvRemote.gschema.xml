@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="io.github.erens.GnomeAndroidTvRemote" path="/io/github/erens/GnomeAndroidTvRemote/">
+    <key name="last-connected-ip" type="s">
+      <default>''</default>
+      <summary>Last successfully connected IP address</summary>
+      <description>The IP address of the last device that was successfully connected to. This will be used as the default value when the app opens.</description>
+    </key>
+  </schema>
+</schemalist>
+

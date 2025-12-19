@@ -29,9 +29,15 @@ class MainWindow(Adw.ApplicationWindow):
         self._adb: AdbTcpClient | None = None
         self._connect_thread: threading.Thread | None = None
 
+        # Initialize GSettings
+        self._settings = Gio.Settings.new("io.github.erens.GnomeAndroidTvRemote")
+
         self._build_ui()
         self._create_actions()
         self._remote_panel.set_handlers(on_keyevent=self._on_remote_keyevent, on_text=self._on_remote_text)
+        
+        # Load last connected IP
+        self._load_last_ip()
 
     def _build_ui(self) -> None:
         self._toast_overlay = Adw.ToastOverlay()
@@ -94,6 +100,16 @@ class MainWindow(Adw.ApplicationWindow):
         split.set_content(remote_page)
 
         self._set_connected(False)
+
+    def _load_last_ip(self) -> None:
+        """Load the last successfully connected IP address from settings."""
+        last_ip = self._settings.get_string("last-connected-ip")
+        if last_ip:
+            self._ip_entry.set_text(last_ip)
+
+    def _save_last_ip(self, ip: str) -> None:
+        """Save the successfully connected IP address to settings."""
+        self._settings.set_string("last-connected-ip", ip)
 
     def _create_actions(self) -> None:
         scan = Gio.SimpleAction.new("scan", None)
@@ -247,6 +263,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_connect_success_ui(self, ip: str, client: AdbTcpClient) -> None:
         self._adb = client
         self._set_connected(True, ip=ip)
+        self._save_last_ip(ip)
         self._toast(f"Connected to {ip}")
 
     def _on_connect_failed_ui(self, msg: str) -> None:
