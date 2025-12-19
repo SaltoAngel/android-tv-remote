@@ -18,6 +18,11 @@ from ..core.scrcpy_controller import (  # noqa: E402
     ScrcpyError,
 )
 from .device_dialog import DeviceDialog  # noqa: E402
+from .preferences_dialog import (  # noqa: E402
+    PreferencesDialog,
+    load_shortcuts_from_settings,
+    get_focus_keyboard_keys,
+)
 from .remote_panel import RemotePanel  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -35,41 +40,31 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
-
-        # Key mapping: Gdk keyval -> ADB keycode
-        self._key_map = {
-            Gdk.KEY_Up: "KEYCODE_DPAD_UP",
-            Gdk.KEY_Down: "KEYCODE_DPAD_DOWN",
-            Gdk.KEY_Left: "KEYCODE_DPAD_LEFT",
-            Gdk.KEY_Right: "KEYCODE_DPAD_RIGHT",
-            Gdk.KEY_Return: "KEYCODE_DPAD_CENTER",
-            Gdk.KEY_KP_Enter: "KEYCODE_DPAD_CENTER",
-            Gdk.KEY_BackSpace: "KEYCODE_MENU",
-            Gdk.KEY_Escape: "KEYCODE_BACK",
-            Gdk.KEY_Home: "KEYCODE_HOME",
-            Gdk.KEY_Menu: "KEYCODE_MENU",
-            Gdk.KEY_space: "KEYCODE_MEDIA_PLAY_PAUSE",
-            Gdk.KEY_plus: "KEYCODE_VOLUME_UP",
-            Gdk.KEY_equal: "KEYCODE_VOLUME_UP",
-            Gdk.KEY_minus: "KEYCODE_VOLUME_DOWN",
-            Gdk.KEY_KP_Add: "KEYCODE_VOLUME_UP",
-            Gdk.KEY_KP_Subtract: "KEYCODE_VOLUME_DOWN",
-            Gdk.KEY_period: "KEYCODE_VOLUME_UP",
-            Gdk.KEY_comma: "KEYCODE_VOLUME_DOWN",
-            Gdk.KEY_p: "KEYCODE_POWER",
-            Gdk.KEY_m: "KEYCODE_VOLUME_MUTE",
-            Gdk.KEY_a: "KEYCODE_ALL_APPS",
-        }
+        self._preferences_dialog: PreferencesDialog | None = None
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erens.GnomeAndroidTvRemote")
 
+        # Load keyboard shortcuts from settings
+        self._key_map: dict[int, str] = {}
+        self._focus_keyboard_keys: list[int] = []
+        self.reload_shortcuts()
+
         self._build_ui()
         self._create_actions()
         self._remote_panel.set_handlers(on_keyevent=self._on_remote_keyevent, on_text=self._on_remote_text)
+        self._remote_panel.update_tooltips(self._settings)
         
         # Load last connected IP and auto-connect
         self._auto_connect_last_ip()
+
+    def reload_shortcuts(self) -> None:
+        """Reload keyboard shortcuts from settings."""
+        self._key_map = load_shortcuts_from_settings(self._settings)
+        self._focus_keyboard_keys = get_focus_keyboard_keys(self._settings)
+        # Update button tooltips
+        if hasattr(self, "_remote_panel"):
+            self._remote_panel.update_tooltips(self._settings)
 
     def _build_ui(self) -> None:
         self._toast_overlay = Adw.ToastOverlay()
@@ -87,6 +82,12 @@ class MainWindow(Adw.ApplicationWindow):
         devices_btn.set_tooltip_text("Manage devices")
         devices_btn.connect("clicked", self._on_devices_clicked)
         header.pack_start(devices_btn)
+
+        # Preferences button
+        prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")
+        prefs_btn.set_tooltip_text("Preferences")
+        prefs_btn.connect("clicked", self._on_preferences_clicked)
+        header.pack_end(prefs_btn)
 
         # Content (remote)
         self._remote_panel = RemotePanel()
@@ -107,6 +108,11 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self._device_dialog.update_last_ip()
         self._device_dialog.present()
+
+    def _on_preferences_clicked(self, *_args) -> None:
+        if self._preferences_dialog is None:
+            self._preferences_dialog = PreferencesDialog(self)
+        self._preferences_dialog.present(self)
 
     def _auto_connect_last_ip(self) -> None:
         """Load the last successfully connected IP address from settings and auto-connect."""
@@ -297,8 +303,8 @@ class MainWindow(Adw.ApplicationWindow):
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
 
-        # Handle "K" key to focus keyboard input area
-        if keyval == Gdk.KEY_k:
+        # Handle focus keyboard shortcut (configurable)
+        if keyval in self._focus_keyboard_keys:
             self._remote_panel.focus_keyboard()
             return True
 

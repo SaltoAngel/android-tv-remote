@@ -11,6 +11,11 @@
       <summary>Discovered devices from last scan</summary>
       <description>JSON-encoded list of devices found during the last scan, including IP and latency.</description>
     </key>
+    <key name="keyboard-shortcuts" type="s">
+      <default>'{}'</default>
+      <summary>Custom keyboard shortcuts</summary>
+      <description>JSON-encoded dictionary mapping action names to Gdk key names. Empty dict means use defaults.</description>
+    </key>
   </schema>
 </schemalist>
 
