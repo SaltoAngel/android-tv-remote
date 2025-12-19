@@ -30,6 +30,9 @@
 - [2025-12-20] Keyboard input mode: Press K to focus a dedicated keyboard input area. When focused, all keystrokes are sent directly to Android TV (like scrcpy). Uses a focusable Label widget to avoid Entry's special key handling. State tracked via `keyboard_focused` property so MainWindow knows to let RemotePanel handle keys. Escape exits keyboard mode and returns focus to the OK button.
 - [2025-12-20] Configurable keyboard shortcuts: All keyboard shortcuts are now configurable through a Preferences dialog. Shortcuts are stored in GSettings (`keyboard-shortcuts` key) as JSON. The `PreferencesDialog` class in `ui/preferences_dialog.py` provides the UI for customizing shortcuts. Default shortcuts are defined in `DEFAULT_SHORTCUTS` dict. Button tooltips in `RemotePanel` dynamically reflect the current shortcut configuration.
 
+## Flatpak Permissions
+- [2025-12-20] Removed `--device=all` permission as the app only uses network-based ADB (TCP), not USB. The permission was unnecessarily broad. Required permissions: `--share=network` (ADB-over-TCP), `--socket=wayland`, `--socket=fallback-x11` (GUI), `--device=dri` (GPU rendering).
+
 ## Known Issues
 - [2025-12-19] Fixed Apps button functionality. Changed from `KEYCODE_APP_SWITCH` (Recents) to `KEYCODE_ALL_APPS` (App Drawer) as it is more commonly expected for an "Apps" button on Android TV remotes.
 - [2025-12-19] Fixed `AttributeError: 'ListBox' object has no attribute 'foreach'`. GTK 4 removed `Gtk.Container.foreach`.
