@@ -6,7 +6,7 @@ GNOME (Libadwaita) desktop app to **scan your LAN for Android TVs**, connect ove
 - **Scan**: discovers private IPv4 /24 networks from your active interfaces and scans for hosts with TCP **5555** open.
 - **Connect**: pure-Python ADB client (no external `adb` binary) with on-device authorization.
 - **Auto-connect**: automatically remembers and connects to the last successfully connected IP address when the app opens.
-- **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, app switch, and text input.
+- **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, apps list, and text input.
 
 ### Android TV setup
 1. Enable **Developer options** on the TV.

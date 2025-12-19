@@ -45,7 +45,7 @@ class RemotePanel(Gtk.Box):
         # Power / Media
         self._add_key_button("Power", "KEYCODE_POWER", 0, 5)
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5)
-        self._add_key_button("Apps", "KEYCODE_APP_SWITCH", 2, 5)
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5)
 
         text_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._text_entry = Gtk.Entry(placeholder_text="Type text to send…")
