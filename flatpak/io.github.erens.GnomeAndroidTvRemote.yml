@@ -38,20 +38,20 @@ modules:
   - name: python3-pyasn1
     buildsystem: simple
     build-commands:
-      - pip3 install --prefix=/app --no-deps --no-build-isolation pyasn1-0.6.1.tar.gz
+      - pip3 install --prefix=/app --no-deps --no-build-isolation pyasn1-0.6.1-py3-none-any.whl
     sources:
       - type: file
-        url: https://files.pythonhosted.org/packages/ba/e9/01f1a64245b89f039897cb0130016d79f77d52669aae6ee7b159a6c4c018/pyasn1-0.6.1.tar.gz
-        sha256: 6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034
+        url: https://files.pythonhosted.org/packages/c8/f1/d6a797abb14f6283c0ddff96bbdd46937f64122b8c925cab503dd37f8214/pyasn1-0.6.1-py3-none-any.whl
+        sha256: 0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629
 
   - name: python3-rsa
     buildsystem: simple
     build-commands:
-      - pip3 install --prefix=/app --no-deps --no-build-isolation rsa-4.9.1.tar.gz
+      - pip3 install --prefix=/app --no-deps --no-build-isolation rsa-4.9.1-py3-none-any.whl
     sources:
       - type: file
-        url: https://files.pythonhosted.org/packages/da/8a/22b7beea3ee0d44b1916c0c1cb0ee3af23b700b6da9f04991899d0c555d4/rsa-4.9.1.tar.gz
-        sha256: e7bdbfdb5497da4c07dfd35530e1a902659db6ff241e39d9953cad06ebd0ae75
+        url: https://files.pythonhosted.org/packages/64/8d/0133e4eb4beed9e425d9a98ed6e081a55d195481b7632472be1af08d2f6b/rsa-4.9.1-py3-none-any.whl
+        sha256: 68635866661c6836b8d39430f97a996acbd61bfa49406748ea243539fe239762
 
   - name: gnome-adb-tv-remote
     buildsystem: simple
