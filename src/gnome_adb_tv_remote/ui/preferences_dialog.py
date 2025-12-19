@@ -22,7 +22,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "back": ["Escape"],
     "home": ["Home"],
     "menu": ["BackSpace"],
-    "volume-up": ["plus", "equal", "KP_Add", "period"],
+    "volume-up": ["plus", "KP_Add", "period"],
     "volume-down": ["minus", "KP_Subtract", "comma"],
     "volume-mute": ["m"],
     "power": ["p"],
