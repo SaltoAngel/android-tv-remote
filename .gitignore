@@ -22,4 +22,3 @@ build-dir/
 .flatpak-builder/
 
 .vscode
-.fish_history_local
