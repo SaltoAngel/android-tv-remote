@@ -87,7 +87,7 @@ def get_key_display_name(key_name: str) -> str:
         "Left": "←",
         "Right": "→",
         "Return": "Enter",
-        "KP_Enter": "Numpad Enter",
+        "KP_Enter": "Enter",
         "Escape": "Esc",
         "BackSpace": "Backspace",
         "space": "Space",
@@ -96,8 +96,8 @@ def get_key_display_name(key_name: str) -> str:
         "equal": "=",
         "period": ".",
         "comma": ",",
-        "KP_Add": "Numpad +",
-        "KP_Subtract": "Numpad -",
+        "KP_Add": "+",
+        "KP_Subtract": "-",
     }
     return display_map.get(key_name, key_name.upper() if len(key_name) == 1 else key_name)
 
@@ -366,7 +366,8 @@ def get_action_tooltip(action: str, settings: Gio.Settings) -> str:
     shortcuts = _load_shortcuts_dict(settings)
     key_names = shortcuts.get(action, [])
     if key_names:
-        display_names = [get_key_display_name(k) for k in key_names]
+        # Get human-readable names and deduplicate (e.g. Enter and Numpad Enter)
+        display_names = list(dict.fromkeys(get_key_display_name(k) for k in key_names))
         return ", ".join(display_names)
     return ""
 
