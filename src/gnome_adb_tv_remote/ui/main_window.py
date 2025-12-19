@@ -131,7 +131,8 @@ class MainWindow(Adw.ApplicationWindow):
             return
 
         self._set_scanning(True)
-        self._device_list.foreach(lambda row: self._device_list.remove(row))
+        while child := self._device_list.get_first_child():
+            self._device_list.remove(child)
         self._found_ips.clear()
 
         nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
