@@ -18,12 +18,12 @@ At the end of each response, if changes were made to files, commit these changes
 
 # AI Context Rule
 
-Save important context about the codebase for future AI sessions in `.cursor/context.md`.
+Save important context about the codebase for future AI sessions in `docs/context.md`.
 
 ## Rules
 
-1. When significant architectural decisions, patterns, or conventions are established, append them to `.cursor/context.md`
-2. If `.cursor/context.md` does not exist, create it with a header
+1. When significant architectural decisions, patterns, or conventions are established, append them to `docs/context.md`
+2. If `docs/context.md` does not exist, create it with a header
 3. Save context about:
    - Project architecture and design patterns
    - Key dependencies and their purposes
