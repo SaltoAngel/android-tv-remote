@@ -41,9 +41,9 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, tooltip="M")
 
         # Volume
-        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, tooltip="- or ,")
+        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, tooltip="- or , or Numpad -")
         self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4)
-        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, tooltip="+ or .")
+        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, tooltip="+ or . or Numpad +")
 
         # Power / Media
         self._add_key_button("Power", "KEYCODE_POWER", 0, 5, tooltip="P")

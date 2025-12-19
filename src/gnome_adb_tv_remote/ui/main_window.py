@@ -52,6 +52,8 @@ class MainWindow(Adw.ApplicationWindow):
             Gdk.KEY_plus: "KEYCODE_VOLUME_UP",
             Gdk.KEY_equal: "KEYCODE_VOLUME_UP",
             Gdk.KEY_minus: "KEYCODE_VOLUME_DOWN",
+            Gdk.KEY_KP_Add: "KEYCODE_VOLUME_UP",
+            Gdk.KEY_KP_Subtract: "KEYCODE_VOLUME_DOWN",
             Gdk.KEY_period: "KEYCODE_VOLUME_UP",
             Gdk.KEY_comma: "KEYCODE_VOLUME_DOWN",
             Gdk.KEY_p: "KEYCODE_POWER",
