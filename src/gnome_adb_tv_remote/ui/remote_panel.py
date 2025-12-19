@@ -52,26 +52,23 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5, tooltip="A")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
-        # Using a Label styled as entry to avoid Entry's special key handling
-        self._keyboard_label = Gtk.Label(label="Press K to focus keyboard")
-        self._keyboard_label.set_hexpand(True)
-        self._keyboard_label.set_focusable(True)
-        self._keyboard_label.add_css_class("dim-label")
-        self._keyboard_label.set_xalign(0)
+        self._keyboard_entry = Gtk.Entry(placeholder_text="Press K to focus keyboard")
+        self._keyboard_entry.set_hexpand(True)
         self._keyboard_focused = False
         
-        # Add key controller to capture keystrokes
+        # Add key controller with CAPTURE phase to intercept before Entry processes
         key_controller = Gtk.EventControllerKey()
+        key_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_controller.connect("key-pressed", self._on_keyboard_key_pressed)
-        self._keyboard_label.add_controller(key_controller)
+        self._keyboard_entry.add_controller(key_controller)
         
-        # Add focus styling and state tracking
+        # Add focus state tracking
         focus_controller = Gtk.EventControllerFocus()
         focus_controller.connect("enter", self._on_keyboard_focus_enter)
         focus_controller.connect("leave", self._on_keyboard_focus_leave)
-        self._keyboard_label.add_controller(focus_controller)
+        self._keyboard_entry.add_controller(focus_controller)
         
-        self.append(self._keyboard_label)
+        self.append(self._keyboard_entry)
 
     def set_handlers(self, *, on_keyevent=None, on_text=None) -> None:
         self._on_keyevent = on_keyevent
@@ -89,14 +86,12 @@ class RemotePanel(Gtk.Box):
     def _on_keyboard_focus_enter(self, *_args) -> None:
         """Called when keyboard input area gains focus."""
         self._keyboard_focused = True
-        self._keyboard_label.remove_css_class("dim-label")
-        self._keyboard_label.set_label("Type here… (Esc to exit)")
+        self._keyboard_entry.set_placeholder_text("Type here… (Esc to exit)")
 
     def _on_keyboard_focus_leave(self, *_args) -> None:
         """Called when keyboard input area loses focus."""
         self._keyboard_focused = False
-        self._keyboard_label.add_css_class("dim-label")
-        self._keyboard_label.set_label("Press K to focus keyboard")
+        self._keyboard_entry.set_placeholder_text("Press K to focus keyboard")
 
     @property
     def keyboard_focused(self) -> bool:
@@ -105,7 +100,7 @@ class RemotePanel(Gtk.Box):
 
     def focus_keyboard(self) -> None:
         """Focus the keyboard input area."""
-        self._keyboard_label.grab_focus()
+        self._keyboard_entry.grab_focus()
 
     def _on_keyboard_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, state: Gdk.ModifierType) -> bool:
         """Handle keystrokes in keyboard mode - send them directly to Android TV."""
