@@ -321,57 +321,33 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_remote_keyevent(self, keycode: str) -> None:
-        """Send a key event to the device.
+        """Send a key event to the device using scrcpy-server.
 
-        Prefers scrcpy for low-latency input (~35-70ms) when available,
-        falls back to ADB shell commands (~200-500ms) otherwise.
+        Requires scrcpy-server connection for low-latency input (~35-70ms).
         """
-        # Try scrcpy first for low latency
         scrcpy = self._scrcpy
-        if scrcpy and scrcpy.connected:
-            # scrcpy input is already low-latency, run directly
-            try:
-                scrcpy.send_keycode(keycode)
-                return
-            except Exception as e:
-                logger.warning(f"scrcpy keyevent failed: {e}, falling back to ADB")
-
-        # Fall back to ADB shell
-        client = self._adb
-        if not client:
+        if not scrcpy or not scrcpy.connected:
+            self._toast("scrcpy-server not connected")
             return
 
-        def worker() -> None:
-            try:
-                client.send_keyevent(keycode)
-            except Exception as e:
-                GLib.idle_add(self._toast, f"Keyevent failed: {e}")
-
-        threading.Thread(target=worker, name="adb-keyevent", daemon=True).start()
+        try:
+            scrcpy.send_keycode(keycode)
+        except Exception as e:
+            logger.error(f"scrcpy keyevent failed: {e}")
+            self._toast(f"Keyevent failed: {e}")
 
     def _on_remote_text(self, text: str) -> None:
-        """Send text input to the device.
+        """Send text input to the device using scrcpy-server.
 
-        Prefers scrcpy when available for better performance.
+        Requires scrcpy-server connection for low-latency input.
         """
-        # Try scrcpy first
         scrcpy = self._scrcpy
-        if scrcpy and scrcpy.connected:
-            try:
-                scrcpy.send_text(text)
-                return
-            except Exception as e:
-                logger.warning(f"scrcpy text input failed: {e}, falling back to ADB")
-
-        # Fall back to ADB shell
-        client = self._adb
-        if not client:
+        if not scrcpy or not scrcpy.connected:
+            self._toast("scrcpy-server not connected")
             return
 
-        def worker() -> None:
-            try:
-                client.send_text(text)
-            except Exception as e:
-                GLib.idle_add(self._toast, f"Send text failed: {e}")
-
-        threading.Thread(target=worker, name="adb-text", daemon=True).start()
+        try:
+            scrcpy.send_text(text)
+        except Exception as e:
+            logger.error(f"scrcpy text input failed: {e}")
+            self._toast(f"Send text failed: {e}")

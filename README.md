@@ -8,7 +8,7 @@ GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 55
 - **Auto-connect**: Remembers and connects to last successful IP on startup
 - **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, apps list, text input
 - **Keyboard Shortcuts**: Control TV with keyboard (see table below)
-- **Low-Latency Input**: Uses scrcpy-server (~35-70ms) for high-performance input, falls back to ADB shell (~200-500ms) if unavailable. No FFmpeg or scrcpy binary required on host.
+- **Low-Latency Input**: Uses scrcpy-server (~35-70ms) for high-performance input. No FFmpeg or scrcpy binary required on host.
 
 ### Keyboard Shortcuts
 | Key | Action |
