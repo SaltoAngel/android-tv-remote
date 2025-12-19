@@ -102,10 +102,22 @@ class MainWindow(Adw.ApplicationWindow):
         self._set_connected(False)
 
     def _load_last_ip(self) -> None:
-        """Load the last successfully connected IP address from settings."""
+        """Load the last successfully connected IP address from settings and auto-connect."""
         last_ip = self._settings.get_string("last-connected-ip")
         if last_ip:
             self._ip_entry.set_text(last_ip)
+            # Automatically attempt connection after UI is fully initialized
+            GLib.idle_add(self._auto_connect_last_ip, last_ip)
+    
+    def _auto_connect_last_ip(self, ip: str) -> bool:
+        """Attempt to automatically connect to the last IP address.
+        
+        Returns False to prevent this callback from being called again.
+        """
+        # Only auto-connect if the IP entry still has this value (user hasn't changed it)
+        if self._ip_entry.get_text().strip() == ip:
+            self.activate_action("win.connect_ip", None)
+        return False
 
     def _save_last_ip(self, ip: str) -> None:
         """Save the successfully connected IP address to settings."""

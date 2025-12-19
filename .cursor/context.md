@@ -18,7 +18,7 @@
 - Application preferences are stored using GSettings (Gio.Settings) with schema defined in `data/io.github.erens.GnomeAndroidTvRemote.gschema.xml`.
 
 ## Features
-- [2025-12-19] Last connected IP address is remembered using GSettings and automatically loaded as default when the app opens. The IP is saved to `last-connected-ip` key in the GSettings schema when a connection succeeds.
+- [2025-12-19] Last connected IP address is remembered using GSettings and automatically connected to when the app opens. The IP is saved to `last-connected-ip` key in the GSettings schema when a connection succeeds. Auto-connection happens asynchronously after UI initialization using `GLib.idle_add`.
 
 ## Known Issues
 - [2025-12-19] Fixed `AttributeError: 'ListBox' object has no attribute 'foreach'`. GTK 4 removed `Gtk.Container.foreach`.
