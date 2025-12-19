@@ -17,8 +17,8 @@
 - Core logic and ADB client are in `src/gnome_adb_tv_remote/core/`.
 - GTK 4 practices are strictly followed (e.g., no `foreach` on containers, use `append`/`remove`/`get_first_child`).
 - Application preferences are stored using GSettings (Gio.Settings) with schema defined in `data/io.github.erens.GnomeAndroidTvRemote.gschema.xml`.
-- [2025-12-19] `MainWindow` handles connection state and remote control logic.
-- [2025-12-19] `DeviceDialog` handles device discovery and IP input.
+- [2025-12-19] `MainWindow` handles connection state and remote control logic. It persists a single `DeviceDialog` instance to preserve scan results and UI state.
+- [2025-12-19] `DeviceDialog` handles device discovery and IP input. It hides instead of destroying itself when closed to maintain state.
 - [2025-12-19] `RemotePanel` provides the user interface for sending key events and text.
 
 ## Features
