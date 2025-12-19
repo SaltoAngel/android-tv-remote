@@ -51,26 +51,27 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, tooltip="Space")
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5, tooltip="A")
 
-        # Text input field - keystrokes are sent directly to Android TV
+        # Keyboard input area - keystrokes are sent directly to Android TV
         # Using a Label styled as entry to avoid Entry's special key handling
-        self._text_entry = Gtk.Label(label="Type to send (Esc to exit)…")
-        self._text_entry.set_hexpand(True)
-        self._text_entry.set_focusable(True)
-        self._text_entry.add_css_class("dim-label")
-        self._text_entry.set_xalign(0)
+        self._keyboard_label = Gtk.Label(label="Press K to focus keyboard")
+        self._keyboard_label.set_hexpand(True)
+        self._keyboard_label.set_focusable(True)
+        self._keyboard_label.add_css_class("dim-label")
+        self._keyboard_label.set_xalign(0)
+        self._keyboard_focused = False
         
         # Add key controller to capture keystrokes
         key_controller = Gtk.EventControllerKey()
-        key_controller.connect("key-pressed", self._on_entry_key_pressed)
-        self._text_entry.add_controller(key_controller)
+        key_controller.connect("key-pressed", self._on_keyboard_key_pressed)
+        self._keyboard_label.add_controller(key_controller)
         
-        # Add focus styling
+        # Add focus styling and state tracking
         focus_controller = Gtk.EventControllerFocus()
-        focus_controller.connect("enter", lambda *_: self._text_entry.remove_css_class("dim-label"))
-        focus_controller.connect("leave", lambda *_: self._text_entry.add_css_class("dim-label"))
-        self._text_entry.add_controller(focus_controller)
+        focus_controller.connect("enter", self._on_keyboard_focus_enter)
+        focus_controller.connect("leave", self._on_keyboard_focus_leave)
+        self._keyboard_label.add_controller(focus_controller)
         
-        self.append(self._text_entry)
+        self.append(self._keyboard_label)
 
     def set_handlers(self, *, on_keyevent=None, on_text=None) -> None:
         self._on_keyevent = on_keyevent
@@ -85,8 +86,29 @@ class RemotePanel(Gtk.Box):
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
 
-    def _on_entry_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, state: Gdk.ModifierType) -> bool:
-        """Handle keystrokes in the text entry - send them directly to Android TV."""
+    def _on_keyboard_focus_enter(self, *_args) -> None:
+        """Called when keyboard input area gains focus."""
+        self._keyboard_focused = True
+        self._keyboard_label.remove_css_class("dim-label")
+        self._keyboard_label.set_label("Type here… (Esc to exit)")
+
+    def _on_keyboard_focus_leave(self, *_args) -> None:
+        """Called when keyboard input area loses focus."""
+        self._keyboard_focused = False
+        self._keyboard_label.add_css_class("dim-label")
+        self._keyboard_label.set_label("Press K to focus keyboard")
+
+    @property
+    def keyboard_focused(self) -> bool:
+        """Returns True if the keyboard input area is focused."""
+        return self._keyboard_focused
+
+    def focus_keyboard(self) -> None:
+        """Focus the keyboard input area."""
+        self._keyboard_label.grab_focus()
+
+    def _on_keyboard_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, state: Gdk.ModifierType) -> bool:
+        """Handle keystrokes in keyboard mode - send them directly to Android TV."""
         # Escape: return focus to the OK button (center of D-pad)
         if keyval == Gdk.KEY_Escape:
             ok_btn = self._keycode_buttons.get("KEYCODE_DPAD_CENTER")
@@ -94,10 +116,10 @@ class RemotePanel(Gtk.Box):
                 ok_btn.grab_focus()
             return True
         
-        # Enter: send KEYCODE_DPAD_CENTER (OK/Enter on TV)
+        # Enter: send KEYCODE_ENTER for text confirmation
         if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             if self._on_keyevent:
-                self._on_keyevent("KEYCODE_DPAD_CENTER")
+                self._on_keyevent("KEYCODE_ENTER")
             return True
         
         # Backspace: send KEYCODE_DEL to delete character on TV
