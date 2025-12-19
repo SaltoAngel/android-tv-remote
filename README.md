@@ -37,8 +37,8 @@ python3 -m gnome_adb_tv_remote
 
 **Flatpak build:**
 ```bash
-flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erens.GnomeAndroidTvRemote.yml
-flatpak run io.github.erens.GnomeAndroidTvRemote
+flatpak-builder --user --install --force-clean build-dir flatpak/io.github.AndroidTvRemote.yml
+flatpak run io.github.AndroidTvRemote
 ```
 
 ### Dependencies

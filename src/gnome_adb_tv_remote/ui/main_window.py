@@ -43,7 +43,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preferences_dialog: PreferencesDialog | None = None
 
         # Initialize GSettings
-        self._settings = Gio.Settings.new("io.github.erens.GnomeAndroidTvRemote")
+        self._settings = Gio.Settings.new("io.github.AndroidTvRemote")
 
         # Load keyboard shortcuts from settings
         self._key_map: dict[int, str] = {}

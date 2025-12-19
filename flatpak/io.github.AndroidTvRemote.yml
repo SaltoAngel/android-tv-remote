@@ -1,4 +1,4 @@
-app-id: io.github.erens.GnomeAndroidTvRemote
+app-id: io.github.AndroidTvRemote
 runtime: org.gnome.Platform
 runtime-version: "48"
 sdk: org.gnome.Sdk
@@ -123,10 +123,10 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --prefix=/app --no-deps --no-build-isolation .
-      - install -D data/io.github.erens.GnomeAndroidTvRemote.desktop /app/share/applications/io.github.erens.GnomeAndroidTvRemote.desktop
-      - install -D data/io.github.erens.GnomeAndroidTvRemote.metainfo.xml /app/share/metainfo/io.github.erens.GnomeAndroidTvRemote.metainfo.xml
-      - install -D data/icons/hicolor/scalable/apps/io.github.erens.GnomeAndroidTvRemote.svg /app/share/icons/hicolor/scalable/apps/io.github.erens.GnomeAndroidTvRemote.svg
-      - install -D data/io.github.erens.GnomeAndroidTvRemote.gschema.xml /app/share/glib-2.0/schemas/io.github.erens.GnomeAndroidTvRemote.gschema.xml
+      - install -D data/io.github.AndroidTvRemote.desktop /app/share/applications/io.github.AndroidTvRemote.desktop
+      - install -D data/io.github.AndroidTvRemote.metainfo.xml /app/share/metainfo/io.github.AndroidTvRemote.metainfo.xml
+      - install -D data/icons/hicolor/scalable/apps/io.github.AndroidTvRemote.svg /app/share/icons/hicolor/scalable/apps/io.github.AndroidTvRemote.svg
+      - install -D data/io.github.AndroidTvRemote.gschema.xml /app/share/glib-2.0/schemas/io.github.AndroidTvRemote.gschema.xml
       - glib-compile-schemas /app/share/glib-2.0/schemas
     sources:
       - type: dir

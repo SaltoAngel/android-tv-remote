@@ -12,7 +12,7 @@ from gi.repository import Adw, Gio, GLib  # noqa: E402
 from .ui.main_window import MainWindow  # noqa: E402
 
 
-APP_ID = "io.github.erens.GnomeAndroidTvRemote"
+APP_ID = "io.github.AndroidTvRemote"
 
 
 class App(Adw.Application):
