@@ -8,6 +8,7 @@ GNOME (Libadwaita) desktop app to **scan your LAN for Android TVs**, connect ove
 - **Auto-connect**: automatically remembers and connects to the last successfully connected IP address when the app opens.
 - **Remote UI**: D-pad, Home/Back/Menu, volume, power, play/pause, apps list, and text input.
 - **Keyboard Shortcuts**: control your TV with your laptop keyboard (arrows, Enter, Backspace, etc.).
+- **Low-Latency Input**: uses scrcpy when available for ~35-70ms input latency (vs ~200-500ms with ADB shell commands).
 
 ### Keyboard Shortcuts
 | Key | Action |
@@ -48,4 +49,9 @@ Build/test locally (example):
 flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erens.GnomeAndroidTvRemote.yml
 flatpak run io.github.erens.GnomeAndroidTvRemote
 ```
+
+### Dependencies (bundled in Flatpak)
+- **PyGObject**: GTK 4 and Libadwaita bindings
+- **adb-shell**: Pure Python ADB protocol implementation
+- **scrcpy**: Low-latency input injection (optional, falls back to ADB shell if unavailable)
 

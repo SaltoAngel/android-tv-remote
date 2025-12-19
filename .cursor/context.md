@@ -11,6 +11,7 @@
 - `PyGObject`: GTK 4 and Libadwaita bindings.
 - `adb_shell`: For ADB protocol implementation.
 - `psutil`: For network interface information.
+- `scrcpy`: For low-latency input injection (optional, falls back to ADB shell if unavailable).
 
 ## Conventions
 - UI code is in `src/gnome_adb_tv_remote/ui/`.
@@ -25,6 +26,7 @@
 - [2025-12-19] Last connected IP address is remembered using GSettings and automatically connected to when the app opens. The IP is saved to `last-connected-ip` key in the GSettings schema when a connection succeeds. Auto-connection happens asynchronously after UI initialization using `GLib.idle_add`.
 - [2025-12-19] Connected device info (manufacturer, model, and Android version) is retrieved via `getprop` and displayed in the `RemotePanel` title/subtitle area upon successful connection.
 - [2025-12-19] Keyboard shortcuts implemented globally in `MainWindow` using `Gtk.EventControllerKey`. Navigation, media controls, and system keys are mapped to ADB keycodes. Shortcuts are automatically disabled when a text entry is focused.
+- [2025-12-19] Low-latency input injection via scrcpy. When scrcpy is available, it's launched in headless mode (`--no-video --no-audio`) to reduce key event latency from ~200-500ms (ADB shell `input keyevent`) to ~35-70ms. Falls back to ADB shell commands gracefully if scrcpy is not installed. Implementation in `ScrcpyController` class in `src/gnome_adb_tv_remote/core/scrcpy_controller.py`.
 
 ## Known Issues
 - [2025-12-19] Fixed Apps button functionality. Changed from `KEYCODE_APP_SWITCH` (Recents) to `KEYCODE_ALL_APPS` (App Drawer) as it is more commonly expected for an "Apps" button on Android TV remotes.

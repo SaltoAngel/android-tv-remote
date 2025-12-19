@@ -9,6 +9,7 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+  - --device=all  # For USB ADB access
 
 build-options:
   env:
@@ -17,6 +18,58 @@ build-options:
     PYTHONNOUSERSITE: "1"
 
 modules:
+  # libusb for USB device access
+  - name: libusb
+    buildsystem: autotools
+    config-opts:
+      - --disable-static
+      - --disable-udev
+    sources:
+      - type: archive
+        url: https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
+        sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879571c6f8e9166f8e4e0da80391
+
+  # FFmpeg (minimal build for scrcpy)
+  - name: ffmpeg
+    buildsystem: autotools
+    config-opts:
+      - --disable-doc
+      - --disable-programs
+      - --disable-static
+      - --enable-shared
+      - --disable-encoders
+      - --disable-muxers
+      - --disable-devices
+      - --disable-hwaccels
+      - --disable-filters
+      - --enable-decoder=h264
+      - --enable-decoder=hevc
+      - --enable-decoder=av1
+    sources:
+      - type: archive
+        url: https://ffmpeg.org/releases/ffmpeg-7.0.2.tar.xz
+        sha256: 8646515b638a3ad303e23af6a3f068e621ec2d498f1d07a82e356f4b5a29b2a0
+    cleanup:
+      - /share/ffmpeg
+
+  # scrcpy for low-latency input injection
+  - name: scrcpy
+    buildsystem: meson
+    config-opts:
+      - -Db_lto=true
+      - -Dprebuilt_server=/app/share/scrcpy/scrcpy-server
+    sources:
+      - type: archive
+        url: https://github.com/Genymobile/scrcpy/archive/refs/tags/v3.1.tar.gz
+        sha256: c4c5bbb2fd63e3c6b4ccd28f4dcb1138a6b8d8c4a1ad13e6dc14582c55e86c15
+        dest: scrcpy-src
+      - type: file
+        url: https://github.com/Genymobile/scrcpy/releases/download/v3.1/scrcpy-server-v3.1
+        sha256: 5cc33a7bc8c1176c5be18a78a47f8e0e0ea4e7a033e3d8237d7f0ec7ce2fb42b
+        dest-filename: scrcpy-server
+    post-install:
+      - install -Dm644 scrcpy-server /app/share/scrcpy/scrcpy-server
+    subdir: scrcpy-src
   - name: python3-psutil
     buildsystem: simple
     build-commands:

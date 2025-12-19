@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import ipaddress
+import logging
 import threading
 
 import gi
@@ -12,8 +12,15 @@ gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient  # noqa: E402
+from ..core.scrcpy_controller import (  # noqa: E402
+    ScrcpyController,
+    ScrcpyConnectionError,
+    ScrcpyNotAvailableError,
+)
 from .device_dialog import DeviceDialog  # noqa: E402
 from .remote_panel import RemotePanel  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -23,6 +30,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._connected_ip: str | None = None
         self._adb: AdbTcpClient | None = None
+        self._scrcpy: ScrcpyController | None = None
+        self._use_scrcpy: bool = True  # Prefer scrcpy for low-latency input
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
@@ -123,6 +132,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._remote_panel.set_sensitive(connected)
         if not connected:
             self._remote_panel.update_device_info(None, None)
+            # Cleanup scrcpy when disconnected
+            if self._scrcpy:
+                try:
+                    self._scrcpy.disconnect()
+                except Exception:
+                    pass
+                self._scrcpy = None
 
     def _on_connect_ip_action(self, _action: Gio.SimpleAction, parameter: GLib.Variant) -> None:
         """Handler for the connect_ip action."""
@@ -195,6 +211,47 @@ class MainWindow(Adw.ApplicationWindow):
             self._toast(f"Connected to {ip}")
         self._connect_silent = False
 
+        # Start scrcpy in background for low-latency input
+        if self._use_scrcpy:
+            self._start_scrcpy_async(ip)
+
+    def _start_scrcpy_async(self, ip: str) -> None:
+        """Start scrcpy controller in background thread for low-latency input."""
+        def worker():
+            try:
+                scrcpy = ScrcpyController(ip, port=5555)
+                scrcpy.set_disconnect_handler(
+                    lambda: GLib.idle_add(self._on_scrcpy_disconnected)
+                )
+                scrcpy.connect()
+                GLib.idle_add(self._on_scrcpy_connected, scrcpy)
+            except ScrcpyNotAvailableError:
+                logger.info("scrcpy not available, using ADB shell fallback")
+                GLib.idle_add(self._on_scrcpy_unavailable)
+            except ScrcpyConnectionError as e:
+                logger.warning(f"scrcpy connection failed: {e}, using ADB shell fallback")
+                GLib.idle_add(self._on_scrcpy_unavailable)
+            except Exception as e:
+                logger.warning(f"scrcpy error: {e}, using ADB shell fallback")
+                GLib.idle_add(self._on_scrcpy_unavailable)
+
+        threading.Thread(target=worker, name="scrcpy-connect", daemon=True).start()
+
+    def _on_scrcpy_connected(self, scrcpy: ScrcpyController) -> None:
+        """Called when scrcpy connects successfully."""
+        self._scrcpy = scrcpy
+        logger.info("scrcpy connected - low-latency input enabled")
+
+    def _on_scrcpy_unavailable(self) -> None:
+        """Called when scrcpy is not available."""
+        self._scrcpy = None
+        # Silently fall back to ADB shell method
+
+    def _on_scrcpy_disconnected(self) -> None:
+        """Called when scrcpy disconnects unexpectedly."""
+        self._scrcpy = None
+        logger.info("scrcpy disconnected")
+
     def _on_connect_failed_ui(self, msg: str) -> None:
         self._adb = None
         self._set_connected(False)
@@ -207,6 +264,14 @@ class MainWindow(Adw.ApplicationWindow):
         if self._connect_thread:
             self._toast("Still connecting…")
             return
+        # Disconnect scrcpy first
+        if self._scrcpy:
+            try:
+                self._scrcpy.disconnect()
+            except Exception:
+                pass
+            self._scrcpy = None
+        # Then disconnect ADB
         if self._adb:
             try:
                 self._adb.disconnect()
@@ -229,6 +294,22 @@ class MainWindow(Adw.ApplicationWindow):
         return False
 
     def _on_remote_keyevent(self, keycode: str) -> None:
+        """Send a key event to the device.
+
+        Prefers scrcpy for low-latency input (~35-70ms) when available,
+        falls back to ADB shell commands (~200-500ms) otherwise.
+        """
+        # Try scrcpy first for low latency
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            # scrcpy input is already low-latency, run directly
+            try:
+                scrcpy.send_keycode(keycode)
+                return
+            except Exception as e:
+                logger.warning(f"scrcpy keyevent failed: {e}, falling back to ADB")
+
+        # Fall back to ADB shell
         client = self._adb
         if not client:
             return
@@ -242,6 +323,20 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=worker, name="adb-keyevent", daemon=True).start()
 
     def _on_remote_text(self, text: str) -> None:
+        """Send text input to the device.
+
+        Prefers scrcpy when available for better performance.
+        """
+        # Try scrcpy first
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_text(text)
+                return
+            except Exception as e:
+                logger.warning(f"scrcpy text input failed: {e}, falling back to ADB")
+
+        # Fall back to ADB shell
         client = self._adb
         if not client:
             return
