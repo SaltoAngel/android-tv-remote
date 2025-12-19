@@ -39,7 +39,7 @@ class RemotePanel(Gtk.Box):
 
         # Volume
         self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4)
-        self._add_key_button("Mute", "KEYCODE_MUTE", 1, 4)
+        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4)
         self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4)
 
         # Power / Media
