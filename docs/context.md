@@ -11,7 +11,7 @@
 - `PyGObject`: GTK 4 and Libadwaita bindings.
 - `adb_shell`: For ADB protocol implementation.
 - `psutil`: For network interface information.
-- `scrcpy`: For low-latency input injection (optional, falls back to ADB shell if unavailable).
+- `scrcpy-server`: For low-latency input injection (pre-built binary pushed to device).
 
 ## Conventions
 - UI code is in `src/gnome_adb_tv_remote/ui/`.
@@ -26,12 +26,15 @@
 - [2025-12-19] Last connected IP address is remembered using GSettings and automatically connected to when the app opens. The IP is saved to `last-connected-ip` key in the GSettings schema when a connection succeeds. Auto-connection happens asynchronously after UI initialization using `GLib.idle_add`.
 - [2025-12-19] Connected device info (manufacturer, model, and Android version) is retrieved via `getprop` and displayed in the `RemotePanel` title/subtitle area upon successful connection.
 - [2025-12-19] Keyboard shortcuts implemented globally in `MainWindow` using `Gtk.EventControllerKey`. Navigation, media controls, and system keys are mapped to ADB keycodes. Shortcuts are automatically disabled when a text entry is focused.
-- [2025-12-19] Low-latency input injection via scrcpy. When scrcpy is available, it's launched in headless mode (`--no-video --no-audio`) to reduce key event latency from ~200-500ms (ADB shell `input keyevent`) to ~35-70ms. Falls back to ADB shell commands gracefully if scrcpy is not installed. Implementation in `ScrcpyController` class in `src/gnome_adb_tv_remote/core/scrcpy_controller.py`.
+- [2025-12-19] Low-latency input injection via scrcpy-server. Instead of using the full scrcpy desktop client, the app uses a custom Python implementation (`ScrcpyServerController`) that pushes `scrcpy-server` to the device and communicates with it directly. This reduces key event latency from ~200-500ms (ADB shell `input keyevent`) to ~35-70ms and removes the dependency on FFmpeg and the scrcpy C client. Falls back to ADB shell commands gracefully if scrcpy-server is not available. Implementation in `ScrcpyServerController` class in `src/gnome_adb_tv_remote/core/scrcpy_controller.py`.
 - [2025-12-20] Keyboard input mode: Press K to focus a dedicated keyboard input area. When focused, all keystrokes are sent directly to Android TV (like scrcpy). Uses a focusable Label widget to avoid Entry's special key handling. State tracked via `keyboard_focused` property so MainWindow knows to let RemotePanel handle keys. Escape exits keyboard mode and returns focus to the OK button.
 - [2025-12-20] Configurable keyboard shortcuts: All keyboard shortcuts are now configurable through a Preferences dialog. Shortcuts are stored in GSettings (`keyboard-shortcuts` key) as JSON. The `PreferencesDialog` class in `ui/preferences_dialog.py` provides the UI for customizing shortcuts. Default shortcuts are defined in `DEFAULT_SHORTCUTS` dict. Button tooltips in `RemotePanel` dynamically reflect the current shortcut configuration.
 
 ## Flatpak Permissions
 - [2025-12-20] Removed `--device=all` permission as the app only uses network-based ADB (TCP), not USB. The permission was unnecessarily broad. Required permissions: `--share=network` (ADB-over-TCP), `--socket=wayland`, `--socket=fallback-x11` (GUI), `--device=dri` (GPU rendering).
+
+## Dependencies
+- [2025-12-20] Removed FFmpeg, scrcpy (C client), and libusb dependencies. The app only requires the `scrcpy-server` binary, which is a Java-based component that runs on the Android device and doesn't require native libraries on the host. This significantly reduces Flatpak build time and bundle size.
 
 ## Known Issues
 - [2025-12-19] Fixed Apps button functionality. Changed from `KEYCODE_APP_SWITCH` (Recents) to `KEYCODE_ALL_APPS` (App Drawer) as it is more commonly expected for an "Apps" button on Android TV remotes.

@@ -28,41 +28,7 @@ modules:
         sha256: acfdcccb123a8718c46c46c059b2f621140194e5ec1ac9d81715be3d6ab6cd0a
         strip-components: 0
 
-  # libusb for USB device access
-  - name: libusb
-    buildsystem: autotools
-    config-opts:
-      - --disable-static
-      - --disable-udev
-    sources:
-      - type: archive
-        url: https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2
-        sha256: ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575
-
-  # FFmpeg (minimal build for scrcpy)
-  - name: ffmpeg
-    buildsystem: autotools
-    config-opts:
-      - --disable-doc
-      - --disable-programs
-      - --disable-static
-      - --enable-shared
-      - --disable-encoders
-      - --disable-muxers
-      - --disable-devices
-      - --disable-hwaccels
-      - --disable-filters
-      - --enable-decoder=h264
-      - --enable-decoder=hevc
-      - --enable-decoder=av1
-    sources:
-      - type: archive
-        url: https://ffmpeg.org/releases/ffmpeg-7.0.2.tar.xz
-        sha256: 8646515b638a3ad303e23af6a3587734447cb8fc0a0c064ecdb8e95c4fd8b389
-    cleanup:
-      - /share/ffmpeg
-
-  # scrcpy-server (pre-built, must be installed before scrcpy build)
+  # scrcpy-server (pre-built)
   - name: scrcpy-server
     buildsystem: simple
     build-commands:
@@ -73,16 +39,6 @@ modules:
         sha256: 958f0944a62f23b1f33a16e9eb14844c1a04b882ca175a738c16d23cb22b86c0
         dest-filename: scrcpy-server
 
-  # scrcpy for low-latency input injection
-  - name: scrcpy
-    buildsystem: meson
-    config-opts:
-      - -Db_lto=true
-      - -Dprebuilt_server=/app/share/scrcpy/scrcpy-server
-    sources:
-      - type: archive
-        url: https://github.com/Genymobile/scrcpy/archive/refs/tags/v3.1.tar.gz
-        sha256: beaa5050a3c45faa77cedc70ad13d88ef26b74d29d52f512b7708671e037d24d
   - name: python3-psutil
     buildsystem: simple
     build-commands:
