@@ -151,6 +151,8 @@ class MainWindow(Adw.ApplicationWindow):
     def _set_connected(self, connected: bool, ip: str | None = None) -> None:
         self._connected_ip = ip if connected else None
         self._remote_panel.set_sensitive(connected)
+        if not connected:
+            self._remote_panel.update_device_info(None, None)
 
     def _on_scan(self, *_args) -> None:
         if self._scan_in_progress:
@@ -270,6 +272,8 @@ class MainWindow(Adw.ApplicationWindow):
             try:
                 try:
                     client.connect()
+                    # Get device info immediately after connection
+                    device_info = client.get_device_info()
                 except AdbAuthRequiredError as e:
                     GLib.idle_add(self._on_connect_failed_ui, str(e) or "Authorization required")
                     return
@@ -280,16 +284,18 @@ class MainWindow(Adw.ApplicationWindow):
                     GLib.idle_add(self._on_connect_failed_ui, str(e) or "Connection failed")
                     return
 
-                GLib.idle_add(self._on_connect_success_ui, ip, client)
+                from ..core.adb_client import DeviceInfo
+                GLib.idle_add(self._on_connect_success_ui, ip, client, device_info)
             finally:
                 GLib.idle_add(self._on_connect_done_ui)
 
         self._connect_thread = threading.Thread(target=worker, name="adb-connect", daemon=True)
         self._connect_thread.start()
 
-    def _on_connect_success_ui(self, ip: str, client: AdbTcpClient) -> None:
+    def _on_connect_success_ui(self, ip: str, client: AdbTcpClient, device_info: DeviceInfo) -> None:
         self._adb = client
         self._set_connected(True, ip=ip)
+        self._remote_panel.update_device_info(device_info, ip)
         self._save_last_ip(ip)
         if not self._connect_silent:
             self._toast(f"Connected to {ip}")

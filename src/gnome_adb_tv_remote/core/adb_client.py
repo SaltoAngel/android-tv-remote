@@ -18,6 +18,13 @@ class ShellResult:
     stdout: str
 
 
+@dataclass(frozen=True)
+class DeviceInfo:
+    manufacturer: str
+    model: str
+    version: str
+
+
 class AdbTcpClient:
     def __init__(self, host: str, *, port: int = 5555, timeout_s: float = 8.0) -> None:
         self._host = host
@@ -82,6 +89,21 @@ class AdbTcpClient:
             dev.close()
         except Exception:
             pass
+
+    def get_device_info(self) -> DeviceInfo:
+        """Retrieve basic device information via getprop.
+
+        This is blocking and should be run in a worker thread.
+        """
+        manufacturer = self.shell("getprop ro.product.manufacturer").stdout.strip()
+        model = self.shell("getprop ro.product.model").stdout.strip()
+        version = self.shell("getprop ro.build.version.release").stdout.strip()
+
+        return DeviceInfo(
+            manufacturer=manufacturer or "Unknown",
+            model=model or "Android Device",
+            version=version or "Unknown",
+        )
 
     def shell(self, command: str) -> ShellResult:
         dev = self._device

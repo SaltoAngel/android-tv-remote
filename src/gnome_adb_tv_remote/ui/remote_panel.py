@@ -16,8 +16,8 @@ class RemotePanel(Gtk.Box):
         self.set_margin_start(18)
         self.set_margin_end(18)
 
-        title = Adw.WindowTitle(title="Remote", subtitle="Connect to a device to enable controls")
-        self.append(title)
+        self._title = Adw.WindowTitle(title="Remote", subtitle="Connect to a device to enable controls")
+        self.append(self._title)
 
         self._grid = Gtk.Grid(column_spacing=10, row_spacing=10)
         self.append(self._grid)
@@ -61,6 +61,15 @@ class RemotePanel(Gtk.Box):
     def set_handlers(self, *, on_keyevent=None, on_text=None) -> None:
         self._on_keyevent = on_keyevent
         self._on_text = on_text
+
+    def update_device_info(self, info: DeviceInfo | None = None, ip: str | None = None) -> None:
+        from ..core.adb_client import DeviceInfo
+        if info and ip:
+            self._title.set_title(f"{info.manufacturer} {info.model}")
+            self._title.set_subtitle(f"Connected to {ip} (Android {info.version})")
+        else:
+            self._title.set_title("Remote")
+            self._title.set_subtitle("Connect to a device to enable controls")
 
     def _send_text(self) -> None:
         text = self._text_entry.get_text()
