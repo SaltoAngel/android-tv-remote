@@ -1,4 +1,4 @@
-## Android TV Remote for GNOME
+## Android TV Remote for Linux
 
 GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 5555), and control with an on-screen remote.
 
