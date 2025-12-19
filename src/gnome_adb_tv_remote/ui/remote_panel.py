@@ -5,7 +5,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gtk  # noqa: E402
+from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 
 class RemotePanel(Gtk.Box):
@@ -24,6 +24,9 @@ class RemotePanel(Gtk.Box):
 
         self._on_keyevent = None
         self._on_text = None
+
+        # Map keycode -> button for visual feedback
+        self._keycode_buttons: dict[str, Gtk.Button] = {}
 
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, tooltip="Arrow Up")
@@ -79,6 +82,28 @@ class RemotePanel(Gtk.Box):
         if self._on_text:
             self._on_text(text)
 
+    def flash_button(self, keycode: str) -> None:
+        """Flash the button corresponding to the keycode to show visual feedback.
+        
+        This is called when a keyboard shortcut triggers a key event,
+        so the user can see which button was activated.
+        """
+        btn = self._keycode_buttons.get(keycode)
+        if not btn:
+            return
+
+        # Add a CSS class for the "pressed" state
+        btn.add_css_class("suggested-action")
+
+        # Remove the class after a short delay
+        def remove_flash():
+            # Don't remove if it's the OK button (which always has suggested-action)
+            if keycode != "KEYCODE_DPAD_CENTER":
+                btn.remove_css_class("suggested-action")
+            return False  # Don't repeat
+
+        GLib.timeout_add(150, remove_flash)
+
     def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False, tooltip: str | None = None) -> None:
         btn = Gtk.Button(label=label)
         if suggested:
@@ -89,5 +114,8 @@ class RemotePanel(Gtk.Box):
         btn.set_hexpand(True)
         btn.set_vexpand(True)
         self._grid.attach(btn, col, row, 1, 1)
+
+        # Register button for visual feedback
+        self._keycode_buttons[keycode] = btn
 
 

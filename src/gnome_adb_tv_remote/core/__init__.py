@@ -2,11 +2,9 @@
 
 from .adb_client import AdbTcpClient, AdbAuthRequiredError, AdbConnectError, DeviceInfo
 from .scrcpy_controller import (
-    ScrcpyController,
     ScrcpyServerController,
     ScrcpyError,
     ScrcpyConnectionError,
-    ScrcpyNotAvailableError,
 )
 
 __all__ = [
@@ -14,9 +12,7 @@ __all__ = [
     "AdbAuthRequiredError",
     "AdbConnectError",
     "DeviceInfo",
-    "ScrcpyController",
     "ScrcpyServerController",
     "ScrcpyError",
     "ScrcpyConnectionError",
-    "ScrcpyNotAvailableError",
 ]

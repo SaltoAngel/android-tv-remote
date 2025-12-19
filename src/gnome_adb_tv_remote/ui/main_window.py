@@ -13,9 +13,9 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient  # noqa: E402
 from ..core.scrcpy_controller import (  # noqa: E402
-    ScrcpyController,
+    ScrcpyServerController,
     ScrcpyConnectionError,
-    ScrcpyNotAvailableError,
+    ScrcpyError,
 )
 from .device_dialog import DeviceDialog  # noqa: E402
 from .remote_panel import RemotePanel  # noqa: E402
@@ -30,8 +30,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._connected_ip: str | None = None
         self._adb: AdbTcpClient | None = None
-        self._scrcpy: ScrcpyController | None = None
-        self._use_scrcpy: bool = True  # Prefer scrcpy for low-latency input
+        self._scrcpy: ScrcpyServerController | None = None
+        self._use_scrcpy: bool = True  # Prefer scrcpy for low-latency input (no window)
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
@@ -216,20 +216,21 @@ class MainWindow(Adw.ApplicationWindow):
             self._start_scrcpy_async(ip)
 
     def _start_scrcpy_async(self, ip: str) -> None:
-        """Start scrcpy controller in background thread for low-latency input."""
+        """Start scrcpy-server controller in background thread for low-latency input.
+        
+        This uses direct communication with scrcpy-server on the device,
+        which means NO WINDOW is opened - all control happens in the background.
+        """
         def worker():
             try:
-                scrcpy = ScrcpyController(ip, port=5555)
+                scrcpy = ScrcpyServerController(ip, port=5555)
                 scrcpy.set_disconnect_handler(
                     lambda: GLib.idle_add(self._on_scrcpy_disconnected)
                 )
                 scrcpy.connect()
                 GLib.idle_add(self._on_scrcpy_connected, scrcpy)
-            except ScrcpyNotAvailableError:
-                logger.info("scrcpy not available, using ADB shell fallback")
-                GLib.idle_add(self._on_scrcpy_unavailable)
-            except ScrcpyConnectionError as e:
-                logger.warning(f"scrcpy connection failed: {e}, using ADB shell fallback")
+            except ScrcpyError as e:
+                logger.warning(f"scrcpy-server connection failed: {e}, using ADB shell fallback")
                 GLib.idle_add(self._on_scrcpy_unavailable)
             except Exception as e:
                 logger.warning(f"scrcpy error: {e}, using ADB shell fallback")
@@ -237,10 +238,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         threading.Thread(target=worker, name="scrcpy-connect", daemon=True).start()
 
-    def _on_scrcpy_connected(self, scrcpy: ScrcpyController) -> None:
-        """Called when scrcpy connects successfully."""
+    def _on_scrcpy_connected(self, scrcpy: ScrcpyServerController) -> None:
+        """Called when scrcpy-server connects successfully."""
         self._scrcpy = scrcpy
-        logger.info("scrcpy connected - low-latency input enabled")
+        logger.info("scrcpy-server connected - low-latency input enabled (no window)")
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -289,7 +290,11 @@ class MainWindow(Adw.ApplicationWindow):
             return False
 
         if keyval in self._key_map:
-            self._on_remote_keyevent(self._key_map[keyval])
+            keycode = self._key_map[keyval]
+            # Flash the button to show visual feedback
+            self._remote_panel.flash_button(keycode)
+            # Send the key event
+            self._on_remote_keyevent(keycode)
             return True
         return False
 
