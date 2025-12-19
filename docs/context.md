@@ -40,3 +40,5 @@
 - [2025-12-19] Fixed `ModuleNotFoundError: No module named 'cryptography'`. The `adb_shell.auth.keygen` module requires `cryptography` for key generation. Instead of adding this complex native dependency, implemented custom key generation in `keystore.py` using only the already-available `rsa` and `pyasn1` packages. The custom implementation generates PKCS#8 PEM private keys and Android-format public keys.
 - [2025-12-19] Fixed Mute button functionality. Changed from `KEYCODE_MUTE` (microphone mute) to `KEYCODE_VOLUME_MUTE` (system volume mute), which is the standard for TV remotes.
 
+## Code Quality
+- [2025-12-20] Code cleanup: removed orphan `ScrcpyController` class (only `ScrcpyServerController` is used). Fixed missing `DeviceInfo` import in `remote_panel.py`. Fixed type hint `callable` → `Callable` in `preferences_dialog.py`. Refactored duplicate shortcut loading logic into single `_load_shortcuts_dict()` helper function.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Callable
 
 import gi
 
@@ -113,10 +114,28 @@ def gdk_name_to_keyval(name: str) -> int | None:
     return keyval if keyval != Gdk.KEY_VoidSymbol else None
 
 
+def _load_shortcuts_dict(settings: Gio.Settings) -> dict[str, list[str]]:
+    """Load shortcuts from settings, merging with defaults.
+    
+    This is the single source of truth for loading shortcut configuration.
+    Returns a dict mapping action names to lists of key names.
+    """
+    shortcuts = {k: v.copy() for k, v in DEFAULT_SHORTCUTS.items()}
+    try:
+        custom = json.loads(settings.get_string("keyboard-shortcuts"))
+        if custom:
+            for action, keys in custom.items():
+                if action in shortcuts:
+                    shortcuts[action] = keys
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return shortcuts
+
+
 class ShortcutButton(Gtk.Button):
     """A button that captures keyboard input to set a shortcut."""
 
-    def __init__(self, action: str, key_names: list[str], on_change: callable) -> None:
+    def __init__(self, action: str, key_names: list[str], on_change: Callable[[str, list[str]], None]) -> None:
         super().__init__()
         self._action = action
         self._key_names = key_names.copy()
@@ -211,16 +230,7 @@ class PreferencesDialog(Adw.Dialog):
 
     def _load_shortcuts(self) -> dict[str, list[str]]:
         """Load shortcuts from settings, falling back to defaults."""
-        shortcuts = DEFAULT_SHORTCUTS.copy()
-        try:
-            custom = json.loads(self._settings.get_string("keyboard-shortcuts"))
-            if custom:
-                for action, keys in custom.items():
-                    if action in shortcuts:
-                        shortcuts[action] = keys
-        except (json.JSONDecodeError, TypeError):
-            pass
-        return shortcuts
+        return _load_shortcuts_dict(self._settings)
 
     def _save_shortcuts(self) -> None:
         """Save custom shortcuts to settings."""
@@ -324,15 +334,7 @@ def load_shortcuts_from_settings(settings: Gio.Settings) -> dict[int, str]:
 
     This function is used by MainWindow to get the current shortcut configuration.
     """
-    shortcuts = DEFAULT_SHORTCUTS.copy()
-    try:
-        custom = json.loads(settings.get_string("keyboard-shortcuts"))
-        if custom:
-            for action, keys in custom.items():
-                if action in shortcuts:
-                    shortcuts[action] = keys
-    except (json.JSONDecodeError, TypeError):
-        pass
+    shortcuts = _load_shortcuts_dict(settings)
 
     # Build keyval -> keycode mapping
     key_map: dict[int, str] = {}
@@ -350,14 +352,7 @@ def load_shortcuts_from_settings(settings: Gio.Settings) -> dict[int, str]:
 
 def get_focus_keyboard_keys(settings: Gio.Settings) -> list[int]:
     """Get the Gdk keyvals for the focus-keyboard action."""
-    shortcuts = DEFAULT_SHORTCUTS.copy()
-    try:
-        custom = json.loads(settings.get_string("keyboard-shortcuts"))
-        if custom and "focus-keyboard" in custom:
-            shortcuts["focus-keyboard"] = custom["focus-keyboard"]
-    except (json.JSONDecodeError, TypeError):
-        pass
-
+    shortcuts = _load_shortcuts_dict(settings)
     keyvals = []
     for key_name in shortcuts.get("focus-keyboard", []):
         keyval = gdk_name_to_keyval(key_name)
@@ -368,14 +363,7 @@ def get_focus_keyboard_keys(settings: Gio.Settings) -> list[int]:
 
 def get_action_tooltip(action: str, settings: Gio.Settings) -> str:
     """Get tooltip text showing the current shortcut for an action."""
-    shortcuts = DEFAULT_SHORTCUTS.copy()
-    try:
-        custom = json.loads(settings.get_string("keyboard-shortcuts"))
-        if custom and action in custom:
-            shortcuts[action] = custom[action]
-    except (json.JSONDecodeError, TypeError):
-        pass
-
+    shortcuts = _load_shortcuts_dict(settings)
     key_names = shortcuts.get(action, [])
     if key_names:
         display_names = [get_key_display_name(k) for k in key_names]

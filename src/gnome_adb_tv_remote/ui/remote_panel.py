@@ -8,6 +8,8 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
+from ..core.adb_client import DeviceInfo  # noqa: E402
+
 
 # Mapping from ADB keycode to action name (for tooltip lookup)
 KEYCODE_TO_ACTION: dict[str, str] = {
@@ -104,7 +106,6 @@ class RemotePanel(Gtk.Box):
             self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
 
     def update_device_info(self, info: DeviceInfo | None = None, ip: str | None = None) -> None:
-        from ..core.adb_client import DeviceInfo
         if info and ip:
             self._title.set_title(f"{info.manufacturer} {info.model}")
             self._title.set_subtitle(f"Connected to {ip} (Android {info.version})")
