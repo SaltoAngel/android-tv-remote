@@ -7,4 +7,5 @@ Icon=io.github.erenseymen.TvRemote
 Terminal=false
 Categories=Utility;Network;
 StartupNotify=true
+Keywords=android;tv;remote;adb;control;network;media;smart;entertainment;google;
 
