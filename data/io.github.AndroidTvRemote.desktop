@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=TV Remote
+Comment=Control an Android TV over the network via ADB
+Exec=android-tv-remote
+Icon=io.android.TvRemote
+Terminal=false
+Categories=Utility;Network;
+StartupNotify=true
+
+
