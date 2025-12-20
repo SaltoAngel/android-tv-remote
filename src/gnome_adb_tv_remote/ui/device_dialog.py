@@ -10,8 +10,9 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
+gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
 from ..core.network_info import get_ipv4_interface_networks  # noqa: E402
@@ -41,10 +42,22 @@ class DeviceDialog(Adw.Window):
         self._build_ui()
         self._load_discovered_devices()
         self.connect("close-request", self._on_close_request)
+        
+        # Add keyboard controller for Escape key
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self._on_key_pressed)
+        self.add_controller(key_controller)
 
     def _on_close_request(self, *_args) -> bool:
         self.hide()
         return True
+
+    def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
+        """Handle keyboard shortcuts in the dialog."""
+        if keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        return False
 
     def update_last_ip(self) -> None:
         """Refresh the IP entry with the last connected IP from settings."""
