@@ -113,8 +113,8 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
 
         # Media
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 0, 5, icon_name="media-playback-start-symbolic")
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 1, 5, icon_name="view-app-grid-symbolic")
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="view-app-grid-symbolic")
+        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name="media-playback-start-symbolic")
         
         # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
         self._add_search_button(2, 5, icon_name="system-search-symbolic")
