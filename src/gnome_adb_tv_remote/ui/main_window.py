@@ -136,9 +136,10 @@ class MainWindow(Adw.ApplicationWindow):
     def _toast(self, text: str) -> None:
         self._toast_overlay.add_toast(Adw.Toast(title=text))
 
-    def _set_connected(self, connected: bool, ip: str | None = None) -> None:
+    def _set_connected(self, connected: bool, ip: str | None = None, *, scrcpy_ready: bool = False) -> None:
         self._connected_ip = ip if connected else None
-        self._remote_panel.set_sensitive(connected)
+        # Butonları sadece scrcpy hazır olduğunda aktif et
+        self._remote_panel.set_sensitive(connected and scrcpy_ready)
         if not connected:
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
@@ -251,6 +252,9 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_scrcpy_connected(self, scrcpy: ScrcpyServerController) -> None:
         """Called when scrcpy-server connects successfully."""
         self._scrcpy = scrcpy
+        # Butonları scrcpy hazır olduğunda aktif et
+        if self._connected_ip:
+            self._remote_panel.set_sensitive(True)
         logger.info("scrcpy-server connected - low-latency input enabled (no window)")
 
     def _on_scrcpy_unavailable(self) -> None:
@@ -293,6 +297,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
+        # scrcpy hazır değilse klavye kısayollarını engelle
+        scrcpy = self._scrcpy
+        if not scrcpy or not scrcpy.connected:
+            return False
+
         # If keyboard input mode is active, handle keys here (before Entry can consume them)
         if self._remote_panel.keyboard_focused:
             return self._remote_panel.handle_keyboard_key(keyval)
