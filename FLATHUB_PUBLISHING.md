@@ -8,26 +8,9 @@ This document provides step-by-step instructions for publishing TV Remote to Fla
 2. A Flathub account (sign up at https://flathub.org)
 3. Your app passing validation checks
 
-## Step 1: Choose a Proper App ID
+## Step 1: App ID Verification
 
-Flathub requires app IDs to follow reverse DNS notation. You have two options:
-
-### Option A: Use a GitHub-based ID (Recommended if you don't own a domain)
-
-Change the app ID to: `io.github.erenseymen.TvRemote`
-
-You'll need to update these files:
-- `flatpak/Android.TV.Remote.yml` → `flatpak/io.github.erenseymen.TvRemote.yml`
-- `data/Android.TV.Remote.desktop` → `data/io.github.erenseymen.TvRemote.desktop`
-- `data/Android.TV.Remote.gschema.xml` → `data/io.github.erenseymen.TvRemote.gschema.xml`
-- `data/Android.TV.Remote.metainfo.xml` → `data/io.github.erenseymen.TvRemote.metainfo.xml`
-- `data/icons/hicolor/scalable/apps/Android.TV.Remote.svg` → `data/icons/hicolor/scalable/apps/io.github.erenseymen.TvRemote.svg`
-- Update the `APP_ID` constant in `src/gnome_adb_tv_remote/app.py`
-- Update references in `build-and-run.sh`
-
-### Option B: Keep Current ID (Only if you own android.tv.remote domain)
-
-Keep the current `Android.TV.Remote` ID only if you can verify ownership of the corresponding domain.
+The application ID has been updated to `io.github.erenseymen.TvRemote`, which follows Flathub's reverse DNS naming requirements for GitHub-hosted projects.
 
 ## Step 2: Add Screenshots
 
@@ -60,7 +43,7 @@ sudo apt install appstream  # Ubuntu/Debian
 Validate your metainfo file:
 
 ```bash
-appstreamcli validate data/Android.TV.Remote.metainfo.xml
+appstreamcli validate data/io.github.erenseymen.TvRemote.metainfo.xml
 ```
 
 Fix any reported issues before proceeding.
@@ -73,7 +56,7 @@ rm -rf build-dir .flatpak-builder
 ./build-and-run.sh
 
 # Test the built app
-flatpak run Android.TV.Remote
+flatpak run io.github.erenseymen.TvRemote
 ```
 
 ## Step 5: Fork the Flathub Repository
@@ -101,11 +84,11 @@ flatpak run Android.TV.Remote
 
 4. Copy your manifest:
    ```bash
-   cp /path/to/android-tv-remote/flatpak/Android.TV.Remote.yml io.github.erenseymen.TvRemote/io.github.erenseymen.TvRemote.yml
+   cp /path/to/android-tv-remote/flatpak/io.github.erenseymen.TvRemote.yml io.github.erenseymen.TvRemote/io.github.erenseymen.TvRemote.yml
    ```
 
 5. **Important**: Modify the manifest for Flathub:
-   - Change `app-id:` to `io.github.erenseymen.TvRemote`
+   - Ensure `app-id:` is `io.github.erenseymen.TvRemote`
    - Change the source from `type: dir` to `type: git` pointing to your GitHub repo:
    
    ```yaml
@@ -137,7 +120,7 @@ flatpak run Android.TV.Remote
 
 The Flathub team will review your submission. Common feedback includes:
 
-- App ID format issues
+- App ID format issues (use `io.github.erenseymen.TvRemote`)
 - Missing or invalid metainfo fields
 - Permission concerns
 - Screenshot requirements

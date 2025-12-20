@@ -19,7 +19,7 @@ from gi.repository import Adw, Gio, GLib  # noqa: E402
 from .ui.main_window import MainWindow  # noqa: E402
 
 
-APP_ID = "Android.TV.Remote"
+APP_ID = "io.github.erenseymen.TvRemote"
 
 
 class App(Adw.Application):

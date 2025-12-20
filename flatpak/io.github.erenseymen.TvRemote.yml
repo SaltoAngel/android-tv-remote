@@ -1,4 +1,4 @@
-app-id: Android.TV.Remote
+app-id: io.github.erenseymen.TvRemote
 runtime: org.gnome.Platform
 runtime-version: "48"
 sdk: org.gnome.Sdk
@@ -79,10 +79,10 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --prefix=/app --no-deps --no-build-isolation .
-      - install -D data/Android.TV.Remote.desktop /app/share/applications/Android.TV.Remote.desktop
-      - install -D data/Android.TV.Remote.metainfo.xml /app/share/metainfo/Android.TV.Remote.metainfo.xml
-      - install -D data/icons/hicolor/scalable/apps/Android.TV.Remote.svg /app/share/icons/hicolor/scalable/apps/Android.TV.Remote.svg
-      - install -D data/Android.TV.Remote.gschema.xml /app/share/glib-2.0/schemas/Android.TV.Remote.gschema.xml
+      - install -D data/io.github.erenseymen.TvRemote.desktop /app/share/applications/io.github.erenseymen.TvRemote.desktop
+      - install -D data/io.github.erenseymen.TvRemote.metainfo.xml /app/share/metainfo/io.github.erenseymen.TvRemote.metainfo.xml
+      - install -D data/icons/hicolor/scalable/apps/io.github.erenseymen.TvRemote.svg /app/share/icons/hicolor/scalable/apps/io.github.erenseymen.TvRemote.svg
+      - install -D data/io.github.erenseymen.TvRemote.gschema.xml /app/share/glib-2.0/schemas/io.github.erenseymen.TvRemote.gschema.xml
       - glib-compile-schemas /app/share/glib-2.0/schemas
     sources:
       - type: dir

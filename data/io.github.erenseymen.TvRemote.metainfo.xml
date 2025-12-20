@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>Android.TV.Remote</id>
+  <id>io.github.erenseymen.TvRemote</id>
   <name>TV Remote</name>
   <summary>Control an Android TV over the network via ADB</summary>
   
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   
-  <developer id="android.tv.remote">
+  <developer id="io.github.erenseymen.TvRemote">
     <name>Eren Seymen</name>
   </developer>
   
@@ -35,7 +35,7 @@
     </p>
   </description>
   
-  <launchable type="desktop-id">Android.TV.Remote.desktop</launchable>
+  <launchable type="desktop-id">io.github.erenseymen.TvRemote.desktop</launchable>
   
   <screenshots>
     <screenshot type="default">

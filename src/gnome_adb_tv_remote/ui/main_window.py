@@ -59,7 +59,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preferences_dialog: PreferencesDialog | None = None
 
         # Initialize GSettings
-        self._settings = Gio.Settings.new("Android.TV.Remote")
+        self._settings = Gio.Settings.new("io.github.erenseymen.TvRemote")
 
         # Load window size
         width = self._settings.get_int("window-width")
