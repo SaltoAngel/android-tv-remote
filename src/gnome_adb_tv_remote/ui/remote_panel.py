@@ -89,13 +89,15 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4)
         self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4)
 
-        # Power / Media
-        self._add_key_button("Power", "KEYCODE_POWER", 0, 5)
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5)
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5)
+        # Media
+        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 0, 5)
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 1, 5)
+        
+        # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
+        self._add_search_button(2, 5)
 
-        # Search button (sends text "s" for YouTube search)
-        self._add_search_button()
+        # Power button (moved to row 6, red color)
+        self._add_power_button()
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -247,14 +249,22 @@ class RemotePanel(Gtk.Box):
         if not btn:
             return
 
+        # Power button already has destructive-action class, skip flashing
+        if keycode == "KEYCODE_DPAD_CENTER":
+            # OK button already has suggested-action, don't add it again
+            return
+        
+        # Power button has destructive-action, don't override with suggested-action
+        if keycode == "KEYCODE_POWER":
+            # Just return, Power button is already styled differently
+            return
+
         # Add a CSS class for the "pressed" state
         btn.add_css_class("suggested-action")
 
         # Remove the class after a short delay
         def remove_flash():
-            # Don't remove if it's the OK button (which always has suggested-action)
-            if keycode != "KEYCODE_DPAD_CENTER":
-                btn.remove_css_class("suggested-action")
+            btn.remove_css_class("suggested-action")
             return False  # Don't repeat
 
         GLib.timeout_add(150, remove_flash)
@@ -292,7 +302,7 @@ class RemotePanel(Gtk.Box):
         self._keycode_buttons[keycode] = btn
         self._keycode_shortcut_labels[keycode] = shortcut_label
 
-    def _add_search_button(self) -> None:
+    def _add_search_button(self, col: int, row: int) -> None:
         """Add Search button that sends text 's' for YouTube search."""
         # Create button
         btn = Gtk.Button()
@@ -318,11 +328,45 @@ class RemotePanel(Gtk.Box):
         # Set box as button child
         btn.set_child(box)
         
-        # Attach to grid, spanning 3 columns
-        self._grid.attach(btn, 0, 6, 3, 1)
+        # Attach to grid, single column width
+        self._grid.attach(btn, col, row, 1, 1)
         
         # Store references
         self._search_button = btn
         self._search_shortcut_label = shortcut_label
+
+    def _add_power_button(self) -> None:
+        """Add Power button with red destructive-action style."""
+        # Create button
+        btn = Gtk.Button()
+        btn.add_css_class("destructive-action")  # Red color
+        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent("KEYCODE_POWER"))
+        btn.set_hexpand(True)
+        btn.set_vexpand(True)
+        
+        # Create vertical box for label and shortcut
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.set_valign(Gtk.Align.CENTER)
+        
+        # Main label
+        main_label = Gtk.Label(label="Power")
+        box.append(main_label)
+        
+        # Shortcut label (smaller, dimmed)
+        shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
+        shortcut_label.add_css_class("dim-label")
+        shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
+        box.append(shortcut_label)
+        
+        # Set box as button child
+        btn.set_child(box)
+        
+        # Attach to grid at row 6, column 1 (2nd column), single column width
+        self._grid.attach(btn, 1, 6, 1, 1)
+        
+        # Register button and shortcut label for updates
+        self._keycode_buttons["KEYCODE_POWER"] = btn
+        self._keycode_shortcut_labels["KEYCODE_POWER"] = shortcut_label
 
 
