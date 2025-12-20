@@ -11,6 +11,18 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 from ..core.adb_client import DeviceInfo  # noqa: E402
 
 
+# CSS for larger button fonts
+BUTTON_CSS = """
+button label {
+    font-size: 14pt;
+}
+
+button label.caption {
+    font-size: 11pt;
+}
+"""
+
+
 # Mapping from ADB keycode to action name (for tooltip lookup)
 KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_DPAD_UP": "dpad-up",
@@ -37,6 +49,11 @@ class RemotePanel(Gtk.Box):
         self.set_margin_bottom(18)
         self.set_margin_start(18)
         self.set_margin_end(18)
+        
+        # Apply CSS for larger button fonts
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(BUTTON_CSS.encode())
+        self.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         self._title = Adw.WindowTitle(title="Remote", subtitle="Connect to a device to enable controls")
         self.append(self._title)
