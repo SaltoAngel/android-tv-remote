@@ -15,6 +15,8 @@ from ..core.adb_client import DeviceInfo  # noqa: E402
 BUTTON_CSS = """
 button.remote-button {
     padding: 12px;
+    min-width: 80px;
+    min-height: 80px;
 }
 
 button.remote-button image {
@@ -82,6 +84,8 @@ class RemotePanel(Gtk.Box):
         self.append(self._status_box)
 
         self._grid = Gtk.Grid(column_spacing=10, row_spacing=10)
+        self._grid.set_column_homogeneous(True)
+        self._grid.set_row_homogeneous(True)
         self.append(self._grid)
 
         self._on_keyevent = None
