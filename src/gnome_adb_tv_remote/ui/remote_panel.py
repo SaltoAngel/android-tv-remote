@@ -102,7 +102,7 @@ class RemotePanel(Gtk.Box):
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="go-up-symbolic")
         self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="go-previous-symbolic")
-        self._add_key_button("OK", "KEYCODE_DPAD_CENTER", 1, 1, suggested=True, icon_name="key-enter-symbolic")
+        self._add_key_button("OK", "KEYCODE_DPAD_CENTER", 1, 1, icon_name="key-enter-symbolic")
         self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="go-next-symbolic")
         self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="go-down-symbolic")
 
@@ -285,17 +285,6 @@ class RemotePanel(Gtk.Box):
         btn = self._keycode_buttons.get(keycode)
         if not btn:
             return
-
-        # Power button already has destructive-action class, skip flashing
-        if keycode == "KEYCODE_DPAD_CENTER":
-            # OK button already has suggested-action, don't add it again
-            return
-        
-        # Power button has destructive-action, don't override with suggested-action
-        if keycode == "KEYCODE_POWER":
-            # Just return, Power button is already styled differently
-            return
-
         # Add a CSS class for the "pressed" state
         btn.add_css_class("suggested-action")
 
@@ -306,12 +295,10 @@ class RemotePanel(Gtk.Box):
 
         GLib.timeout_add(150, remove_flash)
 
-    def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False, icon_name: str | list[str] | None = None) -> None:
+    def _add_key_button(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
         # Create button
         btn = Gtk.Button()
         btn.add_css_class("remote-button")
-        if suggested:
-            btn.add_css_class("suggested-action")
         # Ensure the buttons are accessible/labelled even if showing icon
         btn.set_tooltip_text(label)
         

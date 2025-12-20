@@ -119,7 +119,6 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Power button in header bar
         self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
-        self._power_button.add_css_class("destructive-action")
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
         header.pack_end(self._power_button)
 
