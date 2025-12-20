@@ -211,7 +211,10 @@ class DeviceDialog(Adw.Window):
             self._discovered_devices.append({"ip": ip, "latency_ms": latency_ms})
             self._save_discovered_devices()
 
-        row = Adw.ActionRow(title=ip, subtitle=f"Port 5555 open ({latency_ms:.0f} ms)")
+        row = Adw.ActionRow(
+            title=GLib.markup_escape_text(ip),
+            subtitle=GLib.markup_escape_text(f"Port 5555 open ({latency_ms:.0f} ms)")
+        )
 
         btn = Gtk.Button(label="Connect")
         btn.add_css_class("suggested-action")

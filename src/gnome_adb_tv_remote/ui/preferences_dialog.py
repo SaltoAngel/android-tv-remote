@@ -9,7 +9,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 
 # Default keyboard shortcuts mapping: action -> list of Gdk key names
@@ -283,11 +283,11 @@ class PreferencesDialog(Adw.Dialog):
 
         # Create preference groups for each category
         for category, actions in ACTION_CATEGORIES.items():
-            group = Adw.PreferencesGroup(title=category)
+            group = Adw.PreferencesGroup(title=GLib.markup_escape_text(category))
             content.append(group)
 
             for action in actions:
-                row = Adw.ActionRow(title=ACTION_LABELS.get(action, action))
+                row = Adw.ActionRow(title=GLib.markup_escape_text(ACTION_LABELS.get(action, action)))
 
                 # Shortcut button
                 btn = ShortcutButton(

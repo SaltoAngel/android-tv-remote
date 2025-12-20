@@ -145,8 +145,8 @@ class RemotePanel(Gtk.Box):
 
     def update_device_info(self, info: DeviceInfo | None = None, ip: str | None = None) -> None:
         if info and ip:
-            self._title.set_title(f"{info.manufacturer} {info.model}")
-            self._title.set_subtitle(f"Connected to {ip} (Android {info.version})")
+            self._title.set_title(GLib.markup_escape_text(f"{info.manufacturer} {info.model}"))
+            self._title.set_subtitle(GLib.markup_escape_text(f"Connected to {ip} (Android {info.version})"))
         else:
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
