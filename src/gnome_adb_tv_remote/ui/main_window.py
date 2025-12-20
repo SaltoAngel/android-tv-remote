@@ -186,7 +186,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not silent:
             self._toast(f"Connecting to {ip}:5555…")
         self._connect_silent = silent
-        self._remote_panel.set_connection_status(f"Connecting to {ip}:5555…")
+        self._remote_panel.set_connection_status("Connecting…")
         client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
 
         def worker() -> None:
@@ -223,7 +223,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_silent = False
 
         # Start scrcpy in background for low-latency input
-        self._remote_panel.set_connection_status("Starting scrcpy-server…")
         self._start_scrcpy_async(ip)
 
 
