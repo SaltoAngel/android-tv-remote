@@ -140,8 +140,21 @@ class RemotePanel(Gtk.Box):
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
         from .preferences_dialog import get_action_tooltip
+
+        # Direction buttons generally map to arrow keys which is intuitive,
+        # so we don't need to clutter the UI with their shortcuts.
+        exclude_shortcuts = {
+            "KEYCODE_DPAD_UP",
+            "KEYCODE_DPAD_DOWN",
+            "KEYCODE_DPAD_LEFT",
+            "KEYCODE_DPAD_RIGHT",
+        }
         
         for keycode, shortcut_label in self._keycode_shortcut_labels.items():
+            if keycode in exclude_shortcuts:
+                shortcut_label.set_visible(False)
+                continue
+
             action = KEYCODE_TO_ACTION.get(keycode)
             if action:
                 shortcut_text = get_action_tooltip(action, settings)
