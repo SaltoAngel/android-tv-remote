@@ -13,17 +13,19 @@ GNOME (Libadwaita) app to scan LAN for Android TV devices, connect via ADB TCP (
 ### Keyboard Shortcuts
 | Key | Action |
 | --- | --- |
-| Arrows | Navigate |
-| Enter | Select/OK |
-| Backspace/Esc | Back |
+| Arrow Keys | Navigate (Up/Down/Left/Right) |
+| Enter | OK / Select |
+| Esc | Back |
 | Home | Home |
+| Backspace | Menu |
 | Space | Play/Pause |
-| M | Menu |
+| M | Mute |
 | P | Power |
-| A | All Apps |
+| A | Apps |
 | S | Search (YouTube) |
-| +/. | Volume Up |
-| -, | Volume Down |
+| K | Focus Keyboard |
+| + or . | Volume Up |
+| - or , | Volume Down |
 
 ### Setup
 1. Enable **Developer options** and **USB/Wireless debugging** on TV
