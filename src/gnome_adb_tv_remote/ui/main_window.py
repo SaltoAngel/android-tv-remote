@@ -36,7 +36,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._connected_ip: str | None = None
         self._adb: AdbTcpClient | None = None
         self._scrcpy: ScrcpyServerController | None = None
-        self._use_scrcpy: bool = True  # Prefer scrcpy for low-latency input (no window)
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
@@ -222,8 +221,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_silent = False
 
         # Start scrcpy in background for low-latency input
-        if self._use_scrcpy:
-            self._start_scrcpy_async(ip)
+        self._start_scrcpy_async(ip)
+
 
     def _start_scrcpy_async(self, ip: str) -> None:
         """Start scrcpy-server controller in background thread for low-latency input.
@@ -241,10 +240,10 @@ class MainWindow(Adw.ApplicationWindow):
                 scrcpy.connect()
                 GLib.idle_add(self._on_scrcpy_connected, scrcpy)
             except ScrcpyError as e:
-                logger.warning(f"scrcpy-server connection failed: {e}, using ADB shell fallback")
+                logger.warning(f"scrcpy-server connection failed: {e}")
                 GLib.idle_add(self._on_scrcpy_unavailable)
             except Exception as e:
-                logger.warning(f"scrcpy error: {e}, using ADB shell fallback")
+                logger.warning(f"scrcpy error: {e}")
                 GLib.idle_add(self._on_scrcpy_unavailable)
 
         threading.Thread(target=worker, name="scrcpy-connect", daemon=True).start()
@@ -257,7 +256,6 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
         self._scrcpy = None
-        # Silently fall back to ADB shell method
 
     def _on_scrcpy_disconnected(self) -> None:
         """Called when scrcpy disconnects unexpectedly."""

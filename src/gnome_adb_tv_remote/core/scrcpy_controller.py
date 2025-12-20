@@ -1,9 +1,8 @@
 """
 ScrcpyController - Low-latency input injection using scrcpy-server.
 
-Instead of using slow `input keyevent` shell commands, this module pushes
-scrcpy-server to the Android device and communicates with it directly via
-a socket connection, achieving ~35-70ms latency instead of ~200-500ms.
+This module pushes scrcpy-server to the Android device and communicates with it
+directly via a socket connection, achieving ~35-70ms latency.
 """
 
 from __future__ import annotations
@@ -241,6 +240,13 @@ class ScrcpyServerController:
         
         # Ensure CLI is connected
         subprocess.run([adb, "connect", f"{self._host}:{self._port}"], capture_output=True, env=env, timeout=5)
+
+        # Kill any existing scrcpy-server instances to avoid "Address already in use"
+        logger.info("Cleaning up any existing scrcpy-server instances on device...")
+        subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "pkill", "-f", "scrcpy-server"], capture_output=True, env=env, timeout=5)
+        # Also try killall just in case pkill isn't available
+        subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "killall", "scrcpy-server"], capture_output=True, env=env, timeout=5)
+        time.sleep(0.5)
 
         # Arguments for v3.1: tunnel_forward=true means it listens on device abstract socket 'scrcpy'
         # We don't background with '&' here; we use Popen to keep it alive as a child process.

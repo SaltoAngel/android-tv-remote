@@ -112,6 +112,8 @@ class DeviceDialog(Adw.Window):
         ip_row.append(connect_btn)
         content.append(ip_row)
 
+
+
         # Scan Progress
         self._scan_progress = Gtk.ProgressBar(show_text=True)
         self._scan_progress.set_visible(False)
@@ -231,4 +233,6 @@ class DeviceDialog(Adw.Window):
             self._parent._toast("Scan stopped")
         else:
             self._parent._toast(f"Scan finished ({len(self._found_ips)} found)")
+
+
 

@@ -116,13 +116,5 @@ class AdbTcpClient:
         out = dev.shell(command)  # adb-shell returns a decoded string by default
         return ShellResult(stdout=str(out) if out is not None else "")
 
-    def send_keyevent(self, keycode: str) -> None:
-        # `keycode` should be like "KEYCODE_HOME" or "KEYCODE_DPAD_UP"
-        self.shell(f"input keyevent {keycode}")
-
-    def send_text(self, text: str) -> None:
-        # `input text` expects certain characters escaped; keep MVP simple.
-        safe = text.replace(" ", "%s")
-        self.shell(f'input text "{safe}"')
 
 
