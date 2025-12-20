@@ -116,11 +116,11 @@ class RemotePanel(Gtk.Box):
         self._search_shortcut_label: Gtk.Label | None = None
 
         # D-pad
-        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="go-up-symbolic")
-        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="go-previous-symbolic")
+        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="pan-up-symbolic")
+        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="pan-start-symbolic")
         self._add_key_button("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name=None)
-        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="go-next-symbolic")
-        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="go-down-symbolic")
+        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="pan-end-symbolic")
+        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="pan-down-symbolic")
 
         # System
         self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
