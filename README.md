@@ -38,8 +38,8 @@ GNOME (Libadwaita) app to scan LAN for Android TV devices, connect via ADB TCP (
 ### Development
 **Flatpak build:**
 ```bash
-flatpak-builder --user --install --force-clean build-dir flatpak/io.android.TvRemote.yml
-flatpak run io.android.TvRemote
+flatpak-builder --user --install --force-clean build-dir flatpak/Android.TV.Remote.yml
+flatpak run Android.TV.Remote
 ```
 
 ### Dependencies
