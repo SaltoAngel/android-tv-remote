@@ -112,13 +112,13 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar_view.add_top_bar(header)
 
         # Devices button in top bar
-        devices_btn = Gtk.Button(label="Devices")
+        devices_btn = Gtk.Button(icon_name="video-display-symbolic")
         devices_btn.set_tooltip_text("Manage devices")
         devices_btn.connect("clicked", self._on_devices_clicked)
         header.pack_start(devices_btn)
 
         # Power button in header bar
-        self._power_button = Gtk.Button(label="Power")
+        self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
         self._power_button.add_css_class("destructive-action")
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
         header.pack_end(self._power_button)

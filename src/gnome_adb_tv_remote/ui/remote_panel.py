@@ -13,12 +13,18 @@ from ..core.adb_client import DeviceInfo  # noqa: E402
 
 # CSS for larger button fonts
 BUTTON_CSS = """
-button label {
-    font-size: 14pt;
+button.remote-button {
+    padding: 12px;
 }
 
-button label.caption {
-    font-size: 11pt;
+button.remote-button image {
+    -gtk-icon-style: symbolic;
+}
+
+button.remote-button label.caption {
+    font-size: 0.8em;
+    opacity: 0.7;
+    margin-top: 4px;
 }
 """
 
@@ -90,28 +96,28 @@ class RemotePanel(Gtk.Box):
         self._search_shortcut_label: Gtk.Label | None = None
 
         # D-pad
-        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0)
-        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1)
+        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="go-up-symbolic")
+        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="go-previous-symbolic")
         self._add_key_button("OK", "KEYCODE_DPAD_CENTER", 1, 1, suggested=True)
-        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1)
-        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2)
+        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="go-next-symbolic")
+        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="go-down-symbolic")
 
         # System
-        self._add_key_button("Back", "KEYCODE_BACK", 0, 3)
-        self._add_key_button("Home", "KEYCODE_HOME", 1, 3)
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3)
+        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
+        self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
+        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="open-menu-symbolic")
 
         # Volume
-        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4)
-        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4)
-        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4)
+        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="audio-volume-low-symbolic")
+        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="audio-volume-muted-symbolic")
+        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
 
         # Media
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 0, 5)
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 1, 5)
+        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 0, 5, icon_name="media-playback-start-symbolic")
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 1, 5, icon_name="view-app-grid-symbolic")
         
         # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
-        self._add_search_button(2, 5)
+        self._add_search_button(2, 5, icon_name="system-search-symbolic")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -283,22 +289,34 @@ class RemotePanel(Gtk.Box):
 
         GLib.timeout_add(150, remove_flash)
 
-    def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False) -> None:
+    def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False, icon_name: str | None = None) -> None:
         # Create button
         btn = Gtk.Button()
+        btn.add_css_class("remote-button")
         if suggested:
             btn.add_css_class("suggested-action")
+        # Ensure the buttons are accessible/labelled even if showing icon
+        btn.set_tooltip_text(label)
+        
         btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
         btn.set_hexpand(True)
         btn.set_vexpand(True)
         
-        # Create vertical box for label and shortcut
+        # Create vertical box for content and shortcut
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.set_valign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.CENTER)
         
-        # Main label
-        main_label = Gtk.Label(label=label)
-        box.append(main_label)
+        # Main content (Icon or Label)
+        if icon_name:
+            image = Gtk.Image.new_from_icon_name(icon_name)
+            image.set_pixel_size(24)  # Make icons nicely sized
+            box.append(image)
+        else:
+            main_label = Gtk.Label(label=label)
+            # Make text label bold if no icon
+            main_label.set_markup(f"<b>{label}</b>")
+            box.append(main_label)
         
         # Shortcut label (smaller, dimmed)
         shortcut_label = Gtk.Label()
@@ -316,21 +334,29 @@ class RemotePanel(Gtk.Box):
         self._keycode_buttons[keycode] = btn
         self._keycode_shortcut_labels[keycode] = shortcut_label
 
-    def _add_search_button(self, col: int, row: int) -> None:
+    def _add_search_button(self, col: int, row: int, icon_name: str | None = None) -> None:
         """Add Search button that sends text 's' for YouTube search."""
         # Create button
         btn = Gtk.Button()
+        btn.add_css_class("remote-button")
         btn.set_hexpand(True)
         btn.set_vexpand(True)
+        btn.set_tooltip_text("YouTube Search")
         btn.connect("clicked", lambda *_: self._on_text and self._on_text("s"))
         
         # Create vertical box for label and shortcut
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         box.set_valign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.CENTER)
         
-        # Main label
-        main_label = Gtk.Label(label="YouTube Search")
-        box.append(main_label)
+        # Main content
+        if icon_name:
+            image = Gtk.Image.new_from_icon_name(icon_name)
+            image.set_pixel_size(24)
+            box.append(image)
+        else:
+            main_label = Gtk.Label(label="YouTube Search")
+            box.append(main_label)
         
         # Shortcut label (smaller, dimmed)
         shortcut_label = Gtk.Label()
