@@ -38,3 +38,6 @@ flatpak run io.github.AndroidTvRemote
 
 ### Dependencies
 - PyGObject (GTK4/Libadwaita), adb-shell, scrcpy-server (bundled)
+
+### License
+This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE) file for details. Third-party licenses are listed in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
