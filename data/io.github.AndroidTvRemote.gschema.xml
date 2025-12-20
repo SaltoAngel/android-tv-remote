@@ -16,6 +16,18 @@
       <summary>Custom keyboard shortcuts</summary>
       <description>JSON-encoded dictionary mapping action names to Gdk key names. Empty dict means use defaults.</description>
     </key>
+    <key name="window-width" type="i">
+      <default>500</default>
+      <summary>Window width</summary>
+    </key>
+    <key name="window-height" type="i">
+      <default>650</default>
+      <summary>Window height</summary>
+    </key>
+    <key name="window-is-maximized" type="b">
+      <default>false</default>
+      <summary>Whether the window is maximized</summary>
+    </key>
   </schema>
 </schemalist>
 

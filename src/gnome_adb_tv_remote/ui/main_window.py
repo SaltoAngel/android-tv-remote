@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, application: Adw.Application) -> None:
         super().__init__(application=application, title="Android TV Remote")
-        self.set_default_size(500, 650)
 
         self._connected_ip: str | None = None
         self._adb: AdbTcpClient | None = None
@@ -43,6 +42,15 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.AndroidTvRemote")
+
+        # Load window size
+        width = self._settings.get_int("window-width")
+        height = self._settings.get_int("window-height")
+        self.set_default_size(width, height)
+        if self._settings.get_boolean("window-is-maximized"):
+            self.maximize()
+
+        self.connect("close-request", self._on_close_request)
 
         # Load keyboard shortcuts from settings
         self._key_map: dict[int, str] = {}
@@ -56,6 +64,20 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Load last connected IP and auto-connect
         self._auto_connect_last_ip()
+
+    def _on_close_request(self, *_args) -> bool:
+        """Save window state before closing."""
+        is_maximized = self.is_maximized()
+
+        if not is_maximized:
+            width = self.get_width()
+            height = self.get_height()
+            self._settings.set_int("window-width", width)
+            self._settings.set_int("window-height", height)
+
+        self._settings.set_boolean("window-is-maximized", is_maximized)
+
+        return False  # allow closing
 
     def reload_shortcuts(self) -> None:
         """Reload keyboard shortcuts from settings."""
