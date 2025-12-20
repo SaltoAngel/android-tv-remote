@@ -20,6 +20,16 @@ button label {
 button label.caption {
     font-size: 11pt;
 }
+
+button.power-button {
+    min-width: 60px;
+    min-height: 32px;
+    padding: 4px 8px;
+}
+
+button.power-button label {
+    font-size: 10pt;
+}
 """
 
 
@@ -55,8 +65,19 @@ class RemotePanel(Gtk.Box):
         css_provider.load_from_data(BUTTON_CSS.encode())
         self.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
+        # Title box with Power button
+        self._title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self._title_box.set_valign(Gtk.Align.START)
+        
         self._title = Adw.WindowTitle(title="Remote", subtitle="Connect to a device to enable controls")
-        self.append(self._title)
+        self._title.set_hexpand(True)
+        self._title_box.append(self._title)
+        
+        # Power button will be added here
+        self._power_button: Gtk.Button | None = None
+        self._power_shortcut_label: Gtk.Label | None = None
+        
+        self.append(self._title_box)
 
         # Connection status indicator
         self._status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -113,7 +134,7 @@ class RemotePanel(Gtk.Box):
         # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
         self._add_search_button(2, 5)
 
-        # Power button (moved to row 6, red color)
+        # Power button (next to title, smaller)
         self._add_power_button()
 
         # Keyboard input area - keystrokes are sent directly to Android TV
@@ -163,6 +184,14 @@ class RemotePanel(Gtk.Box):
             else:
                 self._search_shortcut_label.set_text("")
                 self._search_shortcut_label.set_visible(False)
+        
+        # Update Power button tooltip (button is small, show shortcut in tooltip)
+        if self._power_button:
+            power_tooltip = get_action_tooltip("power", settings)
+            if power_tooltip:
+                self._power_button.set_tooltip_text(f"Power ({power_tooltip})")
+            else:
+                self._power_button.set_tooltip_text("Power")
 
     def set_connection_status(self, status: str | None) -> None:
         """Set connection status message.
@@ -353,37 +382,28 @@ class RemotePanel(Gtk.Box):
         self._search_shortcut_label = shortcut_label
 
     def _add_power_button(self) -> None:
-        """Add Power button with red destructive-action style."""
+        """Add Power button with red destructive-action style, next to title."""
         # Create button
         btn = Gtk.Button()
         btn.add_css_class("destructive-action")  # Red color
+        btn.add_css_class("power-button")  # Custom class for smaller size
         btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent("KEYCODE_POWER"))
-        btn.set_hexpand(True)
-        btn.set_vexpand(True)
+        btn.set_valign(Gtk.Align.CENTER)
         
-        # Create vertical box for label and shortcut
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        box.set_valign(Gtk.Align.CENTER)
-        
-        # Main label
+        # Simple label (no shortcut label for compact design)
         main_label = Gtk.Label(label="Power")
-        box.append(main_label)
+        btn.set_child(main_label)
         
-        # Shortcut label (smaller, dimmed)
-        shortcut_label = Gtk.Label()
-        shortcut_label.add_css_class("caption")
-        shortcut_label.add_css_class("dim-label")
-        shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
-        box.append(shortcut_label)
+        # Add to title box
+        self._title_box.append(btn)
         
-        # Set box as button child
-        btn.set_child(box)
-        
-        # Attach to grid at row 6, column 1 (2nd column), single column width
-        self._grid.attach(btn, 1, 6, 1, 1)
-        
-        # Register button and shortcut label for updates
+        # Store references
+        self._power_button = btn
         self._keycode_buttons["KEYCODE_POWER"] = btn
+        # Create shortcut label for tooltip updates (but don't show it)
+        shortcut_label = Gtk.Label()
+        shortcut_label.set_visible(False)
+        self._power_shortcut_label = shortcut_label
         self._keycode_shortcut_labels["KEYCODE_POWER"] = shortcut_label
 
 
