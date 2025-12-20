@@ -114,7 +114,7 @@ class RemotePanel(Gtk.Box):
 
         # Media
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="view-app-grid-symbolic")
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name="media-playback-start-symbolic")
+        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
         
         # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
         self._add_search_button(2, 5, icon_name="system-search-symbolic")
@@ -302,7 +302,7 @@ class RemotePanel(Gtk.Box):
 
         GLib.timeout_add(150, remove_flash)
 
-    def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False, icon_name: str | None = None) -> None:
+    def _add_key_button(self, label: str, keycode: str, col: int, row: int, suggested: bool = False, icon_name: str | list[str] | None = None) -> None:
         # Create button
         btn = Gtk.Button()
         btn.add_css_class("remote-button")
@@ -322,9 +322,18 @@ class RemotePanel(Gtk.Box):
         
         # Main content (Icon or Label)
         if icon_name:
-            image = Gtk.Image.new_from_icon_name(icon_name)
-            image.set_pixel_size(24)  # Make icons nicely sized
-            box.append(image)
+            if isinstance(icon_name, list):
+                icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+                icon_box.set_halign(Gtk.Align.CENTER)
+                for name in icon_name:
+                    image = Gtk.Image.new_from_icon_name(name)
+                    image.set_pixel_size(24)
+                    icon_box.append(image)
+                box.append(icon_box)
+            else:
+                image = Gtk.Image.new_from_icon_name(icon_name)
+                image.set_pixel_size(24)  # Make icons nicely sized
+                box.append(image)
         else:
             main_label = Gtk.Label(label=label)
             # Make text label bold if no icon
