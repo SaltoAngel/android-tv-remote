@@ -85,7 +85,8 @@ modules:
       - install -D data/io.github.erenseymen.TvRemote.gschema.xml /app/share/glib-2.0/schemas/io.github.erenseymen.TvRemote.gschema.xml
       - glib-compile-schemas /app/share/glib-2.0/schemas
     sources:
-      - type: dir
-        path: ..
+      - type: git
+        url: https://github.com/erenseymen/android-tv-remote.git
+        tag: v0.1.0
 
 
