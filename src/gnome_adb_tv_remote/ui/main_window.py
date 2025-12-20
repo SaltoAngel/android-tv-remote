@@ -186,6 +186,7 @@ class MainWindow(Adw.ApplicationWindow):
         if not silent:
             self._toast(f"Connecting to {ip}:5555…")
         self._connect_silent = silent
+        self._remote_panel.set_connection_status(f"Connecting to {ip}:5555…")
         client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
 
         def worker() -> None:
@@ -222,6 +223,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_silent = False
 
         # Start scrcpy in background for low-latency input
+        self._remote_panel.set_connection_status("Starting scrcpy-server…")
         self._start_scrcpy_async(ip)
 
 
@@ -255,11 +257,13 @@ class MainWindow(Adw.ApplicationWindow):
         # Butonları scrcpy hazır olduğunda aktif et
         if self._connected_ip:
             self._remote_panel.set_sensitive(True)
+        self._remote_panel.set_connection_status(None)  # Hide status on success
         logger.info("scrcpy-server connected - low-latency input enabled (no window)")
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
         self._scrcpy = None
+        self._remote_panel.set_connection_status(None)  # Hide status
 
     def _on_scrcpy_disconnected(self) -> None:
         """Called when scrcpy disconnects unexpectedly."""
@@ -269,6 +273,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_connect_failed_ui(self, msg: str) -> None:
         self._adb = None
         self._set_connected(False)
+        self._remote_panel.set_connection_status(None)  # Hide status on failure
         self._toast(msg)
 
     def _on_connect_done_ui(self) -> None:

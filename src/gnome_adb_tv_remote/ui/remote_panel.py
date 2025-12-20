@@ -41,6 +41,23 @@ class RemotePanel(Gtk.Box):
         self._title = Adw.WindowTitle(title="Remote", subtitle="Connect to a device to enable controls")
         self.append(self._title)
 
+        # Connection status indicator
+        self._status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._status_box.set_halign(Gtk.Align.CENTER)
+        self._status_box.set_margin_top(8)
+        self._status_box.set_margin_bottom(8)
+        
+        self._status_spinner = Gtk.Spinner()
+        self._status_spinner.set_size_request(16, 16)
+        self._status_box.append(self._status_spinner)
+        
+        self._status_label = Gtk.Label()
+        self._status_label.add_css_class("dim-label")
+        self._status_box.append(self._status_label)
+        
+        self._status_box.set_visible(False)
+        self.append(self._status_box)
+
         self._grid = Gtk.Grid(column_spacing=10, row_spacing=10)
         self.append(self._grid)
 
@@ -111,6 +128,20 @@ class RemotePanel(Gtk.Box):
         focus_tooltip = get_action_tooltip("focus-keyboard", settings)
         if focus_tooltip:
             self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
+
+    def set_connection_status(self, status: str | None) -> None:
+        """Set connection status message.
+        
+        Args:
+            status: Status message to display, or None to hide the status.
+        """
+        if status:
+            self._status_label.set_text(status)
+            self._status_spinner.start()
+            self._status_box.set_visible(True)
+        else:
+            self._status_spinner.stop()
+            self._status_box.set_visible(False)
 
     def update_device_info(self, info: DeviceInfo | None = None, ip: str | None = None) -> None:
         if info and ip:
