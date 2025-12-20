@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import ipaddress
+import re
 import threading
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ gi.require_version("Adw", "1")
 
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
+from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
 from ..core.network_info import get_ipv4_interface_networks  # noqa: E402
 from ..core.scanner import HostFound, ScanProgress, SubnetScanner  # noqa: E402
 
@@ -33,7 +35,8 @@ class DeviceDialog(Adw.Window):
         self._scan_cancel: threading.Event | None = None
         self._scan_thread: threading.Thread | None = None
         self._found_ips: set[str] = set()
-        self._discovered_devices: list[dict[str, str | float]] = []
+        self._discovered_devices: list[dict[str, str | float | None]] = []
+        self._device_rows: dict[str, Adw.ActionRow] = {}
 
         self._build_ui()
         self._load_discovered_devices()
@@ -59,8 +62,10 @@ class DeviceDialog(Adw.Window):
             for device in devices:
                 ip = device.get("ip")
                 latency = device.get("latency_ms", 0.0)
+                model = device.get("model")
+                version = device.get("version")
                 if ip:
-                    self._on_scan_found_ui(ip, latency, save=False)
+                    self._on_scan_found_ui(ip, latency, save=False, model=model, version=version)
         except Exception:
             pass
 
@@ -157,6 +162,7 @@ class DeviceDialog(Adw.Window):
             self._device_list.remove(child)
         self._found_ips.clear()
         self._discovered_devices.clear()
+        self._device_rows.clear()
         self._save_discovered_devices()
 
         nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
@@ -202,18 +208,32 @@ class DeviceDialog(Adw.Window):
         self._scan_progress.set_fraction(frac)
         self._scan_progress.set_text(f"Scanning {scanned}/{total}")
 
-    def _on_scan_found_ui(self, ip: str, latency_ms: float, save: bool = True) -> None:
+    def _on_scan_found_ui(self, ip: str, latency_ms: float, save: bool = True, model: str | None = None, version: str | None = None) -> None:
         if ip in self._found_ips:
             return
         self._found_ips.add(ip)
 
         if save:
-            self._discovered_devices.append({"ip": ip, "latency_ms": latency_ms})
+            device_data: dict[str, str | float | None] = {"ip": ip, "latency_ms": latency_ms}
+            if model:
+                device_data["model"] = model
+            if version:
+                device_data["version"] = version
+            self._discovered_devices.append(device_data)
             self._save_discovered_devices()
+
+        # Create row with initial info
+        subtitle = f"Port 5555 open ({latency_ms:.0f} ms)"
+        if model and version:
+            subtitle = f"{model} • Android {version} • {latency_ms:.0f} ms"
+        elif model:
+            subtitle = f"{model} • {latency_ms:.0f} ms"
+        elif version:
+            subtitle = f"Android {version} • {latency_ms:.0f} ms"
 
         row = Adw.ActionRow(
             title=GLib.markup_escape_text(ip),
-            subtitle=GLib.markup_escape_text(f"Port 5555 open ({latency_ms:.0f} ms)")
+            subtitle=GLib.markup_escape_text(subtitle)
         )
 
         btn = Gtk.Button(label="Connect")
@@ -223,6 +243,67 @@ class DeviceDialog(Adw.Window):
         row.set_activatable_widget(btn)
 
         self._device_list.append(row)
+        self._device_rows[ip] = row
+
+        # If device info not provided, fetch it in background
+        if not model or not version:
+            self._fetch_device_info_async(ip)
+
+    def _fetch_device_info_async(self, ip: str) -> None:
+        """Fetch device info (name and Android version) in background thread."""
+        def worker() -> None:
+            client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
+            try:
+                client.connect()
+                device_info = client.get_device_info()
+                GLib.idle_add(self._on_device_info_fetched_ui, ip, device_info)
+            except (AdbAuthRequiredError, AdbConnectError, Exception):
+                # If we can't connect or get info, just leave the row as is
+                pass
+            finally:
+                try:
+                    client.disconnect()
+                except Exception:
+                    pass
+
+        thread = threading.Thread(target=worker, name=f"fetch-device-info-{ip}", daemon=True)
+        thread.start()
+
+    def _on_device_info_fetched_ui(self, ip: str, device_info: DeviceInfo) -> None:
+        """Update the device row with fetched device info."""
+        row = self._device_rows.get(ip)
+        if not row:
+            return
+
+        # Update subtitle with device info
+        latency_match = None
+        current_subtitle = row.get_subtitle()
+        if current_subtitle:
+            # Extract latency from existing subtitle
+            match = re.search(r'(\d+\.?\d*)\s*ms', current_subtitle)
+            if match:
+                latency_match = match.group(1)
+
+        subtitle_parts = []
+        if device_info.model:
+            subtitle_parts.append(device_info.model)
+        if device_info.version:
+            subtitle_parts.append(f"Android {device_info.version}")
+        if latency_match:
+            subtitle_parts.append(f"{latency_match} ms")
+        else:
+            subtitle_parts.append("Port 5555 open")
+
+        subtitle = " • ".join(subtitle_parts)
+        row.set_subtitle(GLib.markup_escape_text(subtitle))
+
+        # Update stored device info
+        for device in self._discovered_devices:
+            if device.get("ip") == ip:
+                device["model"] = device_info.model
+                device["version"] = device_info.version
+                self._save_discovered_devices()
+                break
 
     def _connect_from_row(self, ip: str) -> None:
         self._parent._connect_ip_address(ip)
