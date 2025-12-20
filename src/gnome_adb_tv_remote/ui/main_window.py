@@ -63,6 +63,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._create_actions()
         self._remote_panel.set_handlers(on_keyevent=self._on_remote_keyevent, on_text=self._on_remote_text)
         self._remote_panel.update_tooltips(self._settings)
+        # Update Power button tooltip
+        self.reload_shortcuts()
         
         # Load last connected IP and auto-connect
         self._auto_connect_last_ip()
@@ -89,6 +91,14 @@ class MainWindow(Adw.ApplicationWindow):
         # Update button tooltips
         if hasattr(self, "_remote_panel"):
             self._remote_panel.update_tooltips(self._settings)
+        # Update Power button tooltip
+        if hasattr(self, "_power_button"):
+            from .preferences_dialog import get_action_tooltip
+            power_tooltip = get_action_tooltip("power", self._settings)
+            if power_tooltip:
+                self._power_button.set_tooltip_text(f"Power ({power_tooltip})")
+            else:
+                self._power_button.set_tooltip_text("Power")
 
     def _build_ui(self) -> None:
         self._toast_overlay = Adw.ToastOverlay()
@@ -106,6 +116,12 @@ class MainWindow(Adw.ApplicationWindow):
         devices_btn.set_tooltip_text("Manage devices")
         devices_btn.connect("clicked", self._on_devices_clicked)
         header.pack_start(devices_btn)
+
+        # Power button in header bar
+        self._power_button = Gtk.Button(label="Power")
+        self._power_button.add_css_class("destructive-action")
+        self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
+        header.pack_end(self._power_button)
 
         # Preferences button
         prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")
