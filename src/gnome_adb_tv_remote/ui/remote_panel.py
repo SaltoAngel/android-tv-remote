@@ -98,7 +98,7 @@ class RemotePanel(Gtk.Box):
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="go-up-symbolic")
         self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="go-previous-symbolic")
-        self._add_key_button("OK", "KEYCODE_DPAD_CENTER", 1, 1, suggested=True)
+        self._add_key_button("OK", "KEYCODE_DPAD_CENTER", 1, 1, suggested=True, icon_name="key-enter-symbolic")
         self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="go-next-symbolic")
         self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="go-down-symbolic")
 
