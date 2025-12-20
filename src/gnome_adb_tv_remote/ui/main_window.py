@@ -22,6 +22,7 @@ from .preferences_dialog import (  # noqa: E402
     PreferencesDialog,
     load_shortcuts_from_settings,
     get_focus_keyboard_keys,
+    get_search_keys,
 )
 from .remote_panel import RemotePanel  # noqa: E402
 
@@ -55,6 +56,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Load keyboard shortcuts from settings
         self._key_map: dict[int, str] = {}
         self._focus_keyboard_keys: list[int] = []
+        self._search_keys: list[int] = []
         self.reload_shortcuts()
 
         self._build_ui()
@@ -83,6 +85,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Reload keyboard shortcuts from settings."""
         self._key_map = load_shortcuts_from_settings(self._settings)
         self._focus_keyboard_keys = get_focus_keyboard_keys(self._settings)
+        self._search_keys = get_search_keys(self._settings)
         # Update button tooltips
         if hasattr(self, "_remote_panel"):
             self._remote_panel.update_tooltips(self._settings)
@@ -345,6 +348,11 @@ class MainWindow(Adw.ApplicationWindow):
         # Handle focus keyboard shortcut (configurable)
         if keyval in self._focus_keyboard_keys:
             self._remote_panel.focus_keyboard()
+            return True
+
+        # Handle search shortcut (sends text "s" for YouTube search)
+        if keyval in self._search_keys:
+            self._on_remote_text("s")
             return True
 
         # Handle keyboard shortcuts

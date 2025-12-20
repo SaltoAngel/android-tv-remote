@@ -68,6 +68,9 @@ class RemotePanel(Gtk.Box):
         self._keycode_buttons: dict[str, Gtk.Button] = {}
         # Map keycode -> shortcut label for updating shortcuts
         self._keycode_shortcut_labels: dict[str, Gtk.Label] = {}
+        # Search button (special, sends text instead of keycode)
+        self._search_button: Gtk.Button | None = None
+        self._search_shortcut_label: Gtk.Label | None = None
 
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0)
@@ -90,6 +93,9 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Power", "KEYCODE_POWER", 0, 5)
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5)
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 5)
+
+        # Search button (sends text "s" for YouTube search)
+        self._add_search_button()
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -128,6 +134,16 @@ class RemotePanel(Gtk.Box):
         focus_tooltip = get_action_tooltip("focus-keyboard", settings)
         if focus_tooltip:
             self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
+        
+        # Update search button shortcut label
+        if self._search_shortcut_label:
+            search_tooltip = get_action_tooltip("search", settings)
+            if search_tooltip:
+                self._search_shortcut_label.set_text(search_tooltip)
+                self._search_shortcut_label.set_visible(True)
+            else:
+                self._search_shortcut_label.set_text("")
+                self._search_shortcut_label.set_visible(False)
 
     def set_connection_status(self, status: str | None) -> None:
         """Set connection status message.
@@ -275,5 +291,38 @@ class RemotePanel(Gtk.Box):
         # Register button and shortcut label for updates
         self._keycode_buttons[keycode] = btn
         self._keycode_shortcut_labels[keycode] = shortcut_label
+
+    def _add_search_button(self) -> None:
+        """Add Search button that sends text 's' for YouTube search."""
+        # Create button
+        btn = Gtk.Button()
+        btn.set_hexpand(True)
+        btn.set_vexpand(True)
+        btn.connect("clicked", lambda *_: self._on_text and self._on_text("s"))
+        
+        # Create vertical box for label and shortcut
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box.set_valign(Gtk.Align.CENTER)
+        
+        # Main label
+        main_label = Gtk.Label(label="Search")
+        box.append(main_label)
+        
+        # Shortcut label (smaller, dimmed)
+        shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
+        shortcut_label.add_css_class("dim-label")
+        shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
+        box.append(shortcut_label)
+        
+        # Set box as button child
+        btn.set_child(box)
+        
+        # Attach to grid, spanning 3 columns
+        self._grid.attach(btn, 0, 6, 3, 1)
+        
+        # Store references
+        self._search_button = btn
+        self._search_shortcut_label = shortcut_label
 
 

@@ -29,6 +29,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "play-pause": ["space"],
     "apps": ["a"],
     "focus-keyboard": ["k"],
+    "search": ["s"],
 }
 
 # Action to ADB keycode mapping
@@ -48,6 +49,7 @@ ACTION_TO_KEYCODE: dict[str, str] = {
     "play-pause": "KEYCODE_MEDIA_PLAY_PAUSE",
     "apps": "KEYCODE_ALL_APPS",
     "focus-keyboard": None,  # Special action, not an ADB keycode
+    "search": None,  # Special action, sends text "s" instead of keycode
 }
 
 # Human-readable action names
@@ -67,6 +69,7 @@ ACTION_LABELS: dict[str, str] = {
     "play-pause": "Play/Pause",
     "apps": "Apps",
     "focus-keyboard": "Focus Keyboard",
+    "search": "Search (YouTube)",
 }
 
 # Category groupings
@@ -74,7 +77,7 @@ ACTION_CATEGORIES: dict[str, list[str]] = {
     "Navigation": ["dpad-up", "dpad-down", "dpad-left", "dpad-right", "dpad-center"],
     "System": ["back", "home", "menu", "apps"],
     "Volume": ["volume-up", "volume-down", "volume-mute"],
-    "Media & Power": ["play-pause", "power"],
+    "Media & Power": ["play-pause", "power", "search"],
     "Other": ["focus-keyboard"],
 }
 
@@ -361,6 +364,17 @@ def get_focus_keyboard_keys(settings: Gio.Settings) -> list[int]:
     shortcuts = _load_shortcuts_dict(settings)
     keyvals = []
     for key_name in shortcuts.get("focus-keyboard", []):
+        keyval = gdk_name_to_keyval(key_name)
+        if keyval is not None:
+            keyvals.append(keyval)
+    return keyvals
+
+
+def get_search_keys(settings: Gio.Settings) -> list[int]:
+    """Get the Gdk keyvals for the search action."""
+    shortcuts = _load_shortcuts_dict(settings)
+    keyvals = []
+    for key_name in shortcuts.get("search", []):
         keyval = gdk_name_to_keyval(key_name)
         if keyval is not None:
             keyvals.append(keyval)
