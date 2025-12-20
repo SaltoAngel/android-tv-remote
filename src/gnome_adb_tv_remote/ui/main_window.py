@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, application: Adw.Application) -> None:
-        super().__init__(application=application, title="Android TV Remote")
+        super().__init__(application=application, title="TV Remote")
 
         self._connected_ip: str | None = None
         self._adb: AdbTcpClient | None = None
@@ -42,7 +42,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._preferences_dialog: PreferencesDialog | None = None
 
         # Initialize GSettings
-        self._settings = Gio.Settings.new("io.github.AndroidTvRemote")
+        self._settings = Gio.Settings.new("io.android.TvRemote")
 
         # Load window size
         width = self._settings.get_int("window-width")

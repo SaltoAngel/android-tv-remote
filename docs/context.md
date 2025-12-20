@@ -17,7 +17,7 @@
 - UI code is in `src/gnome_adb_tv_remote/ui/`.
 - Core logic and ADB client are in `src/gnome_adb_tv_remote/core/`.
 - GTK 4 practices are strictly followed (e.g., no `foreach` on containers, use `append`/`remove`/`get_first_child`).
-- Application preferences are stored using GSettings (Gio.Settings) with schema defined in `data/io.github.AndroidTvRemote.gschema.xml`.
+- Application preferences are stored using GSettings (Gio.Settings) with schema defined in `data/io.android.TvRemote.gschema.xml`.
 - [2025-12-19] `MainWindow` handles connection state and remote control logic. It persists a single `DeviceDialog` instance to preserve scan results and UI state.
 - [2025-12-19] `DeviceDialog` handles device discovery and IP input. It hides instead of destroying itself when closed to maintain state. Discovered devices are persisted across app restarts using JSON-encoded strings in GSettings (`discovered-devices` key).
 - [2025-12-19] `RemotePanel` provides the user interface for sending key events and text.
@@ -39,7 +39,7 @@
 - [2025-12-20] Removed FFmpeg, scrcpy (C client), and libusb dependencies. The app only requires the `scrcpy-server` binary, which is a Java-based component that runs on the Android device and doesn't require native libraries on the host. This significantly reduces Flatpak build time and bundle size.
 
 ## Known Issues
-- [2025-12-19] Fixed Apps button functionality. Changed from `KEYCODE_APP_SWITCH` (Recents) to `KEYCODE_ALL_APPS` (App Drawer) as it is more commonly expected for an "Apps" button on Android TV remotes.
+- [2025-12-19] Fixed Apps button functionality. Changed from `KEYCODE_APP_SWITCH` (Recents) to `KEYCODE_ALL_APPS` (App Drawer) as it is more commonly expected for an "Apps" button on TV remotes.
 - [2025-12-19] Fixed `AttributeError: 'ListBox' object has no attribute 'foreach'`. GTK 4 removed `Gtk.Container.foreach`.
 - [2025-12-19] Fixed `ModuleNotFoundError: No module named 'pyasn1'`. When using `adb-shell` with RSA authentication in Flatpak, transitive dependencies like `rsa` and `pyasn1` must be explicitly listed in the manifest when building with `--no-deps`.
 - [2025-12-19] Fixed `ModuleNotFoundError: No module named 'cryptography'`. The `adb_shell.auth.keygen` module requires `cryptography` for key generation. Instead of adding this complex native dependency, implemented custom key generation in `keystore.py` using only the already-available `rsa` and `pyasn1` packages. The custom implementation generates PKCS#8 PEM private keys and Android-format public keys.

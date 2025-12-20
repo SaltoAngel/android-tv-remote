@@ -1,4 +1,4 @@
-app-id: io.github.AndroidTvRemote
+app-id: io.android.TvRemote
 runtime: org.gnome.Platform
 runtime-version: "48"
 sdk: org.gnome.Sdk
@@ -79,10 +79,10 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --prefix=/app --no-deps --no-build-isolation .
-      - install -D data/io.github.AndroidTvRemote.desktop /app/share/applications/io.github.AndroidTvRemote.desktop
-      - install -D data/io.github.AndroidTvRemote.metainfo.xml /app/share/metainfo/io.github.AndroidTvRemote.metainfo.xml
-      - install -D data/icons/hicolor/scalable/apps/io.github.AndroidTvRemote.svg /app/share/icons/hicolor/scalable/apps/io.github.AndroidTvRemote.svg
-      - install -D data/io.github.AndroidTvRemote.gschema.xml /app/share/glib-2.0/schemas/io.github.AndroidTvRemote.gschema.xml
+      - install -D data/io.android.TvRemote.desktop /app/share/applications/io.android.TvRemote.desktop
+      - install -D data/io.android.TvRemote.metainfo.xml /app/share/metainfo/io.android.TvRemote.metainfo.xml
+      - install -D data/icons/hicolor/scalable/apps/io.android.TvRemote.svg /app/share/icons/hicolor/scalable/apps/io.android.TvRemote.svg
+      - install -D data/io.android.TvRemote.gschema.xml /app/share/glib-2.0/schemas/io.android.TvRemote.gschema.xml
       - glib-compile-schemas /app/share/glib-2.0/schemas
     sources:
       - type: dir

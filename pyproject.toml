@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "android-tv-remote"
 version = "0.1.0"
-description = "GNOME Android TV remote control over ADB TCP (port 5555)"
+description = "GNOME TV remote control over ADB TCP (port 5555)"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.10"

@@ -227,7 +227,7 @@ class PreferencesDialog(Adw.Dialog):
     def __init__(self, parent: Gtk.Window) -> None:
         super().__init__()
         self._parent = parent
-        self._settings = Gio.Settings.new("io.github.AndroidTvRemote")
+        self._settings = Gio.Settings.new("io.android.TvRemote")
         self._shortcut_buttons: dict[str, ShortcutButton] = {}
         self._shortcuts = self._load_shortcuts()
 

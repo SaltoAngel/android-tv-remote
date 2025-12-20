@@ -1,4 +1,4 @@
-"""Core functionality for Android TV Remote."""
+"""Core functionality for TV Remote."""
 
 from .adb_client import AdbTcpClient, AdbAuthRequiredError, AdbConnectError, DeviceInfo
 from .scrcpy_controller import (

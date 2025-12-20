@@ -1,4 +1,4 @@
-## Android TV Remote for Linux
+## TV Remote for Linux
 
 GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 5555), and control with an on-screen remote.
 
@@ -36,8 +36,8 @@ GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 55
 ### Development
 **Flatpak build:**
 ```bash
-flatpak-builder --user --install --force-clean build-dir flatpak/io.github.AndroidTvRemote.yml
-flatpak run io.github.AndroidTvRemote
+flatpak-builder --user --install --force-clean build-dir flatpak/io.android.TvRemote.yml
+flatpak run io.android.TvRemote
 ```
 
 ### Dependencies

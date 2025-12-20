@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.AndroidTvRemote</id>
-  <name>Android TV Remote</name>
+  <id>io.android.TvRemote</id>
+  <name>TV Remote</name>
   <summary>Control an Android TV over the network via ADB</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -15,7 +15,7 @@
       on the TV.
     </p>
   </description>
-  <launchable type="desktop-id">io.github.AndroidTvRemote.desktop</launchable>
+  <launchable type="desktop-id">io.android.TvRemote.desktop</launchable>
   <categories>
     <category>Utility</category>
     <category>Network</category>
