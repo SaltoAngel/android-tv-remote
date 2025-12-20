@@ -163,8 +163,14 @@ class ShortcutButton(Gtk.Button):
             self.add_css_class("suggested-action")
         else:
             if self._key_names:
-                display_names = [get_key_display_name(k) for k in self._key_names]
-                self.set_label(" / ".join(display_names))
+                # Filter out numpad keys (KP_*) from display
+                non_numpad_keys = [k for k in self._key_names if not k.startswith("KP_")]
+                if non_numpad_keys:
+                    display_names = [get_key_display_name(k) for k in non_numpad_keys]
+                    self.set_label(" / ".join(display_names))
+                else:
+                    # If only numpad keys exist, show "Not set" instead
+                    self.set_label("Not set")
             else:
                 self.set_label("Not set")
             self.remove_css_class("suggested-action")
@@ -366,8 +372,11 @@ def get_action_tooltip(action: str, settings: Gio.Settings) -> str:
     shortcuts = _load_shortcuts_dict(settings)
     key_names = shortcuts.get(action, [])
     if key_names:
-        # Get human-readable names and deduplicate (e.g. Enter and Numpad Enter)
-        display_names = list(dict.fromkeys(get_key_display_name(k) for k in key_names))
-        return " / ".join(display_names)
+        # Filter out numpad keys (KP_*) from display
+        non_numpad_keys = [k for k in key_names if not k.startswith("KP_")]
+        if non_numpad_keys:
+            # Get human-readable names and deduplicate (e.g. Enter and Numpad Enter)
+            display_names = list(dict.fromkeys(get_key_display_name(k) for k in non_numpad_keys))
+            return " / ".join(display_names)
     return ""
 
