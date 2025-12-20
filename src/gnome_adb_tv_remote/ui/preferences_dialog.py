@@ -164,7 +164,7 @@ class ShortcutButton(Gtk.Button):
         else:
             if self._key_names:
                 display_names = [get_key_display_name(k) for k in self._key_names]
-                self.set_label(", ".join(display_names))
+                self.set_label(" / ".join(display_names))
             else:
                 self.set_label("Not set")
             self.remove_css_class("suggested-action")
@@ -368,6 +368,6 @@ def get_action_tooltip(action: str, settings: Gio.Settings) -> str:
     if key_names:
         # Get human-readable names and deduplicate (e.g. Enter and Numpad Enter)
         display_names = list(dict.fromkeys(get_key_display_name(k) for k in key_names))
-        return ", ".join(display_names)
+        return " / ".join(display_names)
     return ""
 
