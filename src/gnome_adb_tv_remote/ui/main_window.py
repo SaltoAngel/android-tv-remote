@@ -137,7 +137,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Power button in header bar
         self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
-        header.pack_end(self._power_button)
+        header.pack_start(self._power_button)
 
         # Preferences button
         prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")

@@ -6,6 +6,8 @@ A GNOME (Libadwaita) application to control Android TV devices over the network 
 ![Platform](https://img.shields.io/badge/platform-Linux-green.svg)
 ![GTK](https://img.shields.io/badge/GTK-4.0-orange.svg)
 
+![Screenshot](screenshots/screenshot.png)
+
 ## Features
 
 - **Network Scanning**: Auto-discovers Android TV devices on your local network by scanning for hosts with ADB port (5555) open
