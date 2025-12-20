@@ -305,7 +305,7 @@ class RemotePanel(Gtk.Box):
         box.set_valign(Gtk.Align.CENTER)
         
         # Main label
-        main_label = Gtk.Label(label="Search")
+        main_label = Gtk.Label(label="YouTube Search")
         box.append(main_label)
         
         # Shortcut label (smaller, dimmed)
