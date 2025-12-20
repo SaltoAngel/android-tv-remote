@@ -154,7 +154,7 @@ class RemotePanel(Gtk.Box):
     def _on_keyboard_focus_enter(self, *_args) -> None:
         """Called when keyboard input area gains focus."""
         self._keyboard_focused = True
-        self._keyboard_entry.set_placeholder_text("Type here… (Esc to exit)")
+        self._keyboard_entry.set_placeholder_text("Type or Ctrl+V to paste (Esc to exit)")
 
     def _on_keyboard_focus_leave(self, *_args) -> None:
         """Called when keyboard input area loses focus."""

@@ -330,6 +330,11 @@ class MainWindow(Adw.ApplicationWindow):
 
         # If keyboard input mode is active, handle keys here (before Entry can consume them)
         if self._remote_panel.keyboard_focused:
+            # Handle Ctrl+V for clipboard paste
+            # We check for CONTROL_MASK and the 'v' key (both lower and upper case)
+            if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_v, Gdk.KEY_V):
+                self._paste_clipboard()
+                return True
             return self._remote_panel.handle_keyboard_key(keyval)
 
         # If an entry/editable is focused (e.g., in DeviceDialog), don't intercept keys
@@ -384,3 +389,21 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             logger.error(f"scrcpy text input failed: {e}")
             self._toast(f"Send text failed: {e}")
+
+    def _paste_clipboard(self) -> None:
+        """Read text from clipboard and send it to the device."""
+        display = Gdk.Display.get_default()
+        if not display:
+            return
+        clipboard = display.get_clipboard()
+        # In Gtk 4, clipboard reading is asynchronous
+        clipboard.read_text_async(None, self._on_clipboard_read_ready, None)
+
+    def _on_clipboard_read_ready(self, clipboard: Gdk.Clipboard, result: Gio.AsyncResult, _data: None) -> None:
+        """Callback for clipboard.read_text_async."""
+        try:
+            text = clipboard.read_text_finish(result)
+            if text:
+                self._on_remote_text(text)
+        except Exception as e:
+            logger.error(f"Failed to read clipboard: {e}")
