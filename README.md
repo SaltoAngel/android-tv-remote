@@ -29,6 +29,9 @@ GNOME (Libadwaita) app to scan LAN for Android TVs, connect via ADB TCP (port 55
 2. Ensure ADB over network on **port 5555** (some TVs need `adb tcpip 5555` once via USB)
 3. Accept authorization prompt on first connect
 
+### Tested Devices
+- **Xiaomi TV Box S (2nd Gen)** - [Product page](https://www.epey.com/medya-oynatici/xiaomi-tv-box-s-2nd-gen.html)
+
 ### Development
 **Flatpak build:**
 ```bash
