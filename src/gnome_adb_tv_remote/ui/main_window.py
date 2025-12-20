@@ -366,9 +366,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._remote_panel.focus_keyboard()
             return True
 
-        # Handle search shortcut (sends text "s" for YouTube search)
+        # Handle search shortcut (sends text "s" for YouTube search, then activates keyboard)
         if keyval in self._search_keys:
             self._on_remote_text("s")
+            self._remote_panel.focus_keyboard()
             return True
 
         # Handle keyboard shortcuts
