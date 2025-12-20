@@ -180,7 +180,7 @@ class RemotePanel(Gtk.Box):
             if action:
                 shortcut_text = get_action_tooltip(action, settings)
                 if shortcut_text:
-                    shortcut_label.set_text(shortcut_text)
+                    shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
                     shortcut_label.set_visible(True)
                 else:
                     shortcut_label.set_text("")
@@ -195,7 +195,7 @@ class RemotePanel(Gtk.Box):
         if self._search_shortcut_label:
             search_tooltip = get_action_tooltip("search", settings)
             if search_tooltip:
-                self._search_shortcut_label.set_text(search_tooltip)
+                self._search_shortcut_label.set_markup(f"<b>{search_tooltip}</b>")
                 self._search_shortcut_label.set_visible(True)
             else:
                 self._search_shortcut_label.set_text("")
@@ -348,10 +348,8 @@ class RemotePanel(Gtk.Box):
             main_label.set_markup(f"<b>{label}</b>")
             box.append(main_label)
         
-        # Shortcut label (smaller, dimmed)
+        # Shortcut label (bold, same as Enter button)
         shortcut_label = Gtk.Label()
-        shortcut_label.add_css_class("caption")
-        shortcut_label.add_css_class("dim-label")
         shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
         box.append(shortcut_label)
         
@@ -388,10 +386,8 @@ class RemotePanel(Gtk.Box):
             main_label = Gtk.Label(label="YouTube Search")
             box.append(main_label)
         
-        # Shortcut label (smaller, dimmed)
+        # Shortcut label (bold, same as Enter button)
         shortcut_label = Gtk.Label()
-        shortcut_label.add_css_class("caption")
-        shortcut_label.add_css_class("dim-label")
         shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
         box.append(shortcut_label)
         
