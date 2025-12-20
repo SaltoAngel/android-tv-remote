@@ -1,3 +1,11 @@
+"""
+Subnet Scanner for discovering Android TV devices.
+
+Provides concurrent TCP port scanning to find devices with ADB enabled
+on port 5555. Uses a thread pool for parallel scanning with progress
+and discovery callbacks.
+"""
+
 from __future__ import annotations
 
 import ipaddress

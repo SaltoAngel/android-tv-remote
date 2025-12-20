@@ -1,3 +1,14 @@
+"""
+ADB RSA Key Generation and Storage.
+
+This module handles the generation and storage of RSA keys for ADB authentication.
+Keys are stored in XDG config directory and are compatible with the Android 
+ADB protocol format.
+
+The implementation avoids the `cryptography` library by using `rsa` and `pyasn1`
+for key generation, making it lighter-weight for Flatpak distribution.
+"""
+
 from __future__ import annotations
 
 import base64

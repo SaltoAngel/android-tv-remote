@@ -14,11 +14,12 @@ build/
 venv/
 .env
 
-# Editor/OS
+# Editor/IDE
 .DS_Store
+.vscode/
+.cursor/
+.idea/
 
 # Flatpak / build outputs
 build-dir/
 .flatpak-builder/
-
-.vscode

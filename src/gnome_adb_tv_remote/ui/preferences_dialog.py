@@ -1,3 +1,11 @@
+"""
+Preferences Dialog for Keyboard Shortcut Configuration.
+
+This module provides the PreferencesDialog class for customizing keyboard
+shortcuts, along with helper functions for loading shortcut configurations
+from GSettings and converting between key names and values.
+"""
+
 from __future__ import annotations
 
 import json

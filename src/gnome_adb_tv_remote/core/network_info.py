@@ -1,3 +1,11 @@
+"""
+Network Interface Information.
+
+This module provides utilities for discovering local network interfaces
+and their associated IPv4 networks. Used for determining which networks
+to scan for Android TV devices.
+"""
+
 from __future__ import annotations
 
 import ipaddress

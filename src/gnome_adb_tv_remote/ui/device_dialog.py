@@ -1,3 +1,11 @@
+"""
+Device Discovery and Connection Dialog.
+
+This module provides the DeviceDialog class, a modal dialog for discovering
+Android TV devices on the local network and initiating connections. It includes
+network scanning functionality and persists discovered devices across sessions.
+"""
+
 from __future__ import annotations
 
 import json
@@ -23,6 +31,15 @@ if TYPE_CHECKING:
 
 
 class DeviceDialog(Adw.Window):
+    """Modal dialog for discovering and connecting to Android TV devices.
+    
+    Provides:
+    - Manual IP address entry for direct connection
+    - Network scanning to discover devices with ADB enabled
+    - Persistence of discovered devices across app sessions
+    - Device info display (model, Android version, latency)
+    """
+
     def __init__(self, parent: MainWindow) -> None:
         super().__init__(
             transient_for=parent,

@@ -1,3 +1,10 @@
+"""
+Application entry point and GTK Application class.
+
+This module defines the main Adw.Application subclass and the entry point
+function for the TV Remote application.
+"""
+
 from __future__ import annotations
 
 import sys
@@ -16,6 +23,12 @@ APP_ID = "Android.TV.Remote"
 
 
 class App(Adw.Application):
+    """Main application class for TV Remote.
+    
+    Handles application lifecycle, global actions, and window management.
+    Uses Adw.Application for Libadwaita integration.
+    """
+
     def __init__(self) -> None:
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
 

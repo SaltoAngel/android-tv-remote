@@ -3,25 +3,99 @@
   <id>Android.TV.Remote</id>
   <name>TV Remote</name>
   <summary>Control an Android TV over the network via ADB</summary>
+  
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  
+  <developer id="android.tv.remote">
+    <name>Eren Seymen</name>
+  </developer>
+  
   <description>
     <p>
-      Scan your local network for Android TV devices that expose ADB on port 5555,
-      connect, then use an on-screen remote to navigate and type text.
+      TV Remote is a modern GNOME application that lets you control your Android TV 
+      from your Linux desktop. It discovers Android TV devices on your local network, 
+      connects via ADB (Android Debug Bridge), and provides an intuitive remote control 
+      interface.
     </p>
+    <p>Features:</p>
+    <ul>
+      <li>Automatic network scanning to discover Android TV devices</li>
+      <li>Low-latency input (35-70ms) using scrcpy-server technology</li>
+      <li>Full D-pad navigation, volume controls, and media buttons</li>
+      <li>Keyboard shortcuts for all remote functions</li>
+      <li>Text input for searching and typing on your TV</li>
+      <li>Auto-connect to last used device on startup</li>
+      <li>Native GNOME/Libadwaita design following HIG</li>
+    </ul>
     <p>
-      First connection may require you to accept the "Allow USB debugging?" prompt
-      on the TV.
+      Setup: Enable Developer options and USB/Wireless debugging on your TV, 
+      ensure ADB over network is enabled on port 5555, and accept the authorization 
+      prompt on first connection.
     </p>
   </description>
+  
   <launchable type="desktop-id">Android.TV.Remote.desktop</launchable>
+  
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main remote control interface</caption>
+      <image>https://raw.githubusercontent.com/erenseymen/android-tv-remote/main/screenshots/main-window.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Device discovery and connection</caption>
+      <image>https://raw.githubusercontent.com/erenseymen/android-tv-remote/main/screenshots/device-dialog.png</image>
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://github.com/erenseymen/android-tv-remote</url>
+  <url type="bugtracker">https://github.com/erenseymen/android-tv-remote/issues</url>
+  <url type="vcs-browser">https://github.com/erenseymen/android-tv-remote</url>
+  
+  <content_rating type="oars-1.1" />
+  
+  <branding>
+    <color type="primary" scheme_preference="light">#4a90d9</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+  
   <categories>
     <category>Utility</category>
     <category>Network</category>
   </categories>
+  
+  <keywords>
+    <keyword>Android</keyword>
+    <keyword>TV</keyword>
+    <keyword>Remote</keyword>
+    <keyword>ADB</keyword>
+    <keyword>Control</keyword>
+  </keywords>
+  
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </recommends>
+  
   <releases>
-    <release version="0.1.0" date="2025-12-18"/>
+    <release version="0.1.0" date="2025-12-18">
+      <description>
+        <p>Initial release with core features:</p>
+        <ul>
+          <li>Network scanning for Android TV devices</li>
+          <li>ADB-over-TCP connection with RSA authentication</li>
+          <li>Low-latency input via scrcpy-server</li>
+          <li>Full remote control interface with D-pad, volume, and media controls</li>
+          <li>Keyboard shortcuts for all functions</li>
+          <li>Text input support</li>
+          <li>Auto-connect to last device</li>
+        </ul>
+      </description>
+    </release>
   </releases>
 </component>
-

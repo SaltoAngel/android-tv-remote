@@ -1,3 +1,11 @@
+"""
+Main Application Window.
+
+This module contains the MainWindow class which serves as the primary window
+for the TV Remote application. It coordinates device connections, remote control
+input, and integrates with the scrcpy-server for low-latency input injection.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -30,6 +38,15 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(Adw.ApplicationWindow):
+    """Main application window for TV Remote.
+    
+    Handles:
+    - Device connection lifecycle (ADB and scrcpy-server)
+    - Keyboard shortcut processing
+    - Coordination between UI components (RemotePanel, DeviceDialog, PreferencesDialog)
+    - Window state persistence
+    """
+
     def __init__(self, application: Adw.Application) -> None:
         super().__init__(application=application, title="TV Remote")
 
@@ -178,7 +195,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _set_connected(self, connected: bool, ip: str | None = None, *, scrcpy_ready: bool = False) -> None:
         self._connected_ip = ip if connected else None
-        # Butonları sadece scrcpy hazır olduğunda aktif et
+        # Only enable buttons when scrcpy is ready
         self._remote_panel.set_sensitive(connected and scrcpy_ready)
         if not connected:
             self._remote_panel.update_device_info(None, None)
@@ -293,7 +310,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_scrcpy_connected(self, scrcpy: ScrcpyServerController) -> None:
         """Called when scrcpy-server connects successfully."""
         self._scrcpy = scrcpy
-        # Butonları scrcpy hazır olduğunda aktif et
+        # Enable buttons when scrcpy is ready
         if self._connected_ip:
             self._remote_panel.set_sensitive(True)
         self._remote_panel.set_connection_status(None)  # Hide status on success
@@ -341,7 +358,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
-        # scrcpy hazır değilse klavye kısayollarını engelle
+        # Ignore keyboard shortcuts if scrcpy is not ready
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
             return False

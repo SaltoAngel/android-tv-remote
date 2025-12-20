@@ -1,3 +1,11 @@
+"""
+ADB TCP Client for connecting to Android devices over the network.
+
+Provides a high-level interface for connecting to Android devices via 
+ADB-over-TCP (port 5555), handling RSA key authentication, and executing
+shell commands.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

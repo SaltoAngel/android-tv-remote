@@ -1,3 +1,11 @@
+"""
+Remote Control Panel Widget.
+
+This module provides the RemotePanel class, the main remote control interface
+that displays navigation buttons, volume controls, media buttons, and a text
+input area. Button presses are translated to ADB key events.
+"""
+
 from __future__ import annotations
 
 import gi
@@ -51,6 +59,13 @@ KEYCODE_TO_ACTION: dict[str, str] = {
 
 
 class RemotePanel(Gtk.Box):
+    """Remote control panel widget with navigation and media buttons.
+    
+    Displays a grid of buttons for D-pad navigation, system controls,
+    volume, and media playback. Also provides a keyboard input area
+    for typing text on the connected device.
+    """
+
     def __init__(self) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         self.set_margin_top(18)
