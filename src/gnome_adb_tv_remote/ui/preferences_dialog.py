@@ -22,20 +22,20 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 # Default keyboard shortcuts mapping: action -> list of Gdk key names
 DEFAULT_SHORTCUTS: dict[str, list[str]] = {
-    "dpad-up": ["Up"],
-    "dpad-down": ["Down"],
-    "dpad-left": ["Left"],
-    "dpad-right": ["Right"],
-    "dpad-center": ["Return", "KP_Enter"],
-    "back": ["Escape"],
-    "home": ["Home"],
-    "menu": ["BackSpace"],
+    "dpad-up": ["Up", "w"],
+    "dpad-down": ["Down", "s"],
+    "dpad-left": ["Left", "a"],
+    "dpad-right": ["Right", "d"],
+    "dpad-center": ["Return", "KP_Enter", "e"],
+    "back": ["Escape", "q"],
+    "home": ["h"],
+    "menu": ["i", "Idotabove"],
     "volume-up": ["plus", "KP_Add", "period"],
     "volume-down": ["minus", "KP_Subtract", "comma"],
     "volume-mute": ["m"],
-    "power": ["p"],
+    "power": ["Delete"],
     "play-pause": ["space"],
-    "apps": ["a"],
+    "apps": ["r"],
     "focus-keyboard": ["k"],
     "search": ["s"],
 }
@@ -109,6 +109,7 @@ def get_key_display_name(key_name: str) -> str:
         "comma": ",",
         "KP_Add": "+",
         "KP_Subtract": "-",
+        "Idotabove": "I",
     }
     return display_map.get(key_name, key_name.upper() if len(key_name) == 1 else key_name)
 
@@ -177,7 +178,8 @@ class ShortcutButton(Gtk.Button):
                 # Filter out numpad keys (KP_*) from display
                 non_numpad_keys = [k for k in self._key_names if not k.startswith("KP_")]
                 if non_numpad_keys:
-                    display_names = [get_key_display_name(k) for k in non_numpad_keys]
+                    # Get human-readable names and deduplicate (e.g. i and Idotabove both show as I)
+                    display_names = list(dict.fromkeys(get_key_display_name(k) for k in non_numpad_keys))
                     self.set_label(" / ".join(display_names))
                 else:
                     # If only numpad keys exist, show "Not set" instead
