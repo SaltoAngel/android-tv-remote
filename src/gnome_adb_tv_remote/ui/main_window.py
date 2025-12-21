@@ -137,9 +137,23 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Power button in header bar
         self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
-        
+        self._power_button.add_css_class("power-button")
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
         header.pack_start(self._power_button)
+
+        # Apply CSS for power button hover effect (red on hover)
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_string("""
+            button.power-button:hover {
+                background-color: #e74c3c;
+                color: white;
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
         # Preferences button
         prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")
