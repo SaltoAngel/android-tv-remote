@@ -35,7 +35,11 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "volume-mute": ["m"],
     "power": ["Delete"],
     "play-pause": ["space"],
+    "previous": ["z"],
+    "next": ["x"],
     "apps": ["r"],
+    "assistant": ["g"],
+    "captions": ["c"],
     "focus-keyboard": ["k"],
     "search": ["f"],
 }
@@ -55,7 +59,11 @@ ACTION_TO_KEYCODE: dict[str, str] = {
     "volume-mute": "KEYCODE_VOLUME_MUTE",
     "power": "KEYCODE_POWER",
     "play-pause": "KEYCODE_MEDIA_PLAY_PAUSE",
+    "previous": "KEYCODE_MEDIA_PREVIOUS",
+    "next": "KEYCODE_MEDIA_NEXT",
     "apps": "KEYCODE_ALL_APPS",
+    "assistant": "KEYCODE_ASSIST",
+    "captions": "KEYCODE_CAPTIONS",
     "focus-keyboard": None,  # Special action, not an ADB keycode
     "search": None,  # Special action, sends text "s" instead of keycode
 }
@@ -75,18 +83,23 @@ ACTION_LABELS: dict[str, str] = {
     "volume-mute": "Mute",
     "power": "Power",
     "play-pause": "Play/Pause",
+    "previous": "Previous",
+    "next": "Next",
     "apps": "Apps",
+    "assistant": "Google Assistant",
+    "captions": "Captions/Subtitles",
     "focus-keyboard": "Focus Keyboard",
-    "search": "Find (YouTube only)",
+    "search": "Find (YouTube)",
 }
 
 # Category groupings
 ACTION_CATEGORIES: dict[str, list[str]] = {
     "Navigation": ["dpad-up", "dpad-down", "dpad-left", "dpad-right", "dpad-center"],
-    "System": ["back", "home", "menu", "apps"],
+    "System": ["back", "home", "menu", "apps", "assistant"],
     "Volume": ["volume-up", "volume-down", "volume-mute"],
-    "Media & Power": ["play-pause", "power", "search"],
-    "Other": ["focus-keyboard"],
+    "Media": ["play-pause", "previous", "next"],
+    "TV Controls": ["power", "captions"],
+    "Other": ["focus-keyboard", "search"],
 }
 
 

@@ -36,14 +36,18 @@ All shortcuts are configurable through the Preferences dialog.
 | Esc / Q | Back |
 | H | Home |
 | I | Menu |
-| Space | Play/Pause |
-| M | Mute |
-| Delete | Power |
 | R | Apps |
-| F | Search (YouTube) |
-| K | Focus Keyboard |
+| G | Google Assistant |
+| Space | Play/Pause |
+| Z | Previous |
+| X | Next |
+| M | Mute |
 | + or . | Volume Up |
 | - or , | Volume Down |
+| Delete | Power |
+| C | Captions/Subtitles |
+| F | Search (YouTube) |
+| K | Focus Keyboard |
 
 ## Installation
 

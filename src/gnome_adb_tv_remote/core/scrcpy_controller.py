@@ -64,10 +64,16 @@ AKEYCODE_MAP = {
     "KEYCODE_MEDIA_PREVIOUS": 88,
     "KEYCODE_MEDIA_REWIND": 89,
     "KEYCODE_MEDIA_FAST_FORWARD": 90,
-    # Apps
+    # Apps & TV
     "KEYCODE_ALL_APPS": 284,
     "KEYCODE_TV": 170,
     "KEYCODE_TV_INPUT": 178,
+    "KEYCODE_SETTINGS": 176,
+    "KEYCODE_INFO": 165,
+    # Assistant
+    "KEYCODE_ASSIST": 219,
+    # Accessibility
+    "KEYCODE_CAPTIONS": 175,
     # Keyboard input
     "KEYCODE_ENTER": 66,
     "KEYCODE_DEL": 67,  # Backspace

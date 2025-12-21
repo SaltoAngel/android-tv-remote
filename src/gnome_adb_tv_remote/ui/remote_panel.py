@@ -65,9 +65,12 @@ KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_VOLUME_UP": "volume-up",
     "KEYCODE_VOLUME_DOWN": "volume-down",
     "KEYCODE_VOLUME_MUTE": "volume-mute",
-    "KEYCODE_POWER": "power",
     "KEYCODE_MEDIA_PLAY_PAUSE": "play-pause",
+    "KEYCODE_MEDIA_PREVIOUS": "previous",
+    "KEYCODE_MEDIA_NEXT": "next",
     "KEYCODE_ALL_APPS": "apps",
+    "KEYCODE_ASSIST": "assistant",
+    "KEYCODE_CAPTIONS": "captions",
 }
 
 
@@ -144,12 +147,18 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="audio-volume-muted-symbolic")
         self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
 
-        # Media
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="view-app-grid-symbolic")
+        # Media - Row 5: Playback controls
+        self._add_key_button("Prev", "KEYCODE_MEDIA_PREVIOUS", 0, 5, icon_name="media-skip-backward-symbolic")
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
+        self._add_key_button("Next", "KEYCODE_MEDIA_NEXT", 2, 5, icon_name="media-skip-forward-symbolic")
         
-        # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
-        self._add_search_button(2, 5, icon_name="system-search-symbolic")
+        # System - Row 6: Apps, Assistant, Search
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 6, icon_name="view-app-grid-symbolic")
+        self._add_search_button(1, 6, icon_name="system-search-symbolic")
+        self._add_key_button("Assistant", "KEYCODE_ASSIST", 2, 6, icon_name="audio-input-microphone-symbolic")
+        
+        # Row 7: Subtitles only (centered)
+        self._add_key_button("Subtitles (YouTube)", "KEYCODE_CAPTIONS", 1, 7, icon_name="media-view-subtitles-symbolic")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -415,7 +424,7 @@ class RemotePanel(Gtk.Box):
         btn.add_css_class("remote-button")
         btn.set_hexpand(True)
         btn.set_vexpand(True)
-        btn.set_tooltip_text("Find (YouTube only)")
+        btn.set_tooltip_text("Find (YouTube)")
         btn.connect("clicked", lambda *_: self._on_text and self._on_text("s"))
         
         # Create vertical box for label and shortcut
@@ -428,7 +437,7 @@ class RemotePanel(Gtk.Box):
             image = self._create_icon(icon_name)
             box.append(image)
         else:
-            main_label = Gtk.Label(label="Find (YouTube only)")
+            main_label = Gtk.Label(label="Find (YouTube)")
             box.append(main_label)
         
         # Shortcut label (bold, same as Enter button)
