@@ -15,8 +15,20 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+import os
 
 from ..core.adb_client import DeviceInfo  # noqa: E402
+
+# Path to material icons
+def get_icons_dir():
+    # Check Flatpak path first
+    flatpak_path = "/app/share/io.github.erenseymen.TvRemote/icons/material"
+    if os.path.exists(flatpak_path):
+        return flatpak_path
+    # Fallback to local development path
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/icons/material"))
+
+ICONS_DIR = get_icons_dir()
 
 
 # CSS for larger button fonts
@@ -116,28 +128,28 @@ class RemotePanel(Gtk.Box):
         self._search_shortcut_label: Gtk.Label | None = None
 
         # D-pad
-        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="pan-up-symbolic")
-        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="pan-start-symbolic")
-        self._add_key_button("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name=None)
-        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="pan-end-symbolic")
-        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="pan-down-symbolic")
+        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
+        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="keyboard_arrow_left-symbolic.svg")
+        self._add_key_button("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name="fiber_manual_record-symbolic.svg")
+        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="keyboard_arrow_right-symbolic.svg")
+        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="keyboard_arrow_down-symbolic.svg")
 
         # System
-        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
-        self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="open-menu-symbolic")
+        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="arrow_back-symbolic.svg")
+        self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="home-symbolic.svg")
+        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="menu-symbolic.svg")
 
         # Volume
-        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="audio-volume-low-symbolic")
-        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="audio-volume-muted-symbolic")
-        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
+        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="volume_down-symbolic.svg")
+        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="volume_off-symbolic.svg")
+        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="volume_up-symbolic.svg")
 
         # Media
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="view-app-grid-symbolic")
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="apps-symbolic.svg")
+        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["play_arrow-symbolic.svg", "pause-symbolic.svg"])
         
         # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
-        self._add_search_button(2, 5, icon_name="system-search-symbolic")
+        self._add_search_button(2, 5, icon_name="search-symbolic.svg")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -201,18 +213,9 @@ class RemotePanel(Gtk.Box):
                 shortcut_text = get_action_tooltip("dpad-center", settings)
                 
                 # Update Enter button label with new shortcut
-                btn = self._keycode_buttons.get(keycode)
-                if btn:
-                    box = btn.get_child()
-                    if box and isinstance(box, Gtk.Box):
-                        # Find the main label (first child that's a Label)
-                        for child in list(box):
-                            if isinstance(child, Gtk.Label) and child != shortcut_label:
-                                if shortcut_text:
-                                    child.set_markup(f"<b>{shortcut_text}</b>")
-                                else:
-                                    child.set_markup("<b>Enter</b>")
-                                break
+                # Since we use an icon now, we don't update the main label text
+                # Logic kept here if we ever want to revert or handle tooltip
+                pass
                 
                 # Show shortcut label only if changed from default
                 if current_keys != default_keys:
@@ -383,13 +386,11 @@ class RemotePanel(Gtk.Box):
                 icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
                 icon_box.set_halign(Gtk.Align.CENTER)
                 for name in icon_name:
-                    image = Gtk.Image.new_from_icon_name(name)
-                    image.set_pixel_size(24)
+                    image = self._create_icon(name)
                     icon_box.append(image)
                 box.append(icon_box)
             else:
-                image = Gtk.Image.new_from_icon_name(icon_name)
-                image.set_pixel_size(24)  # Make icons nicely sized
+                image = self._create_icon(icon_name)
                 box.append(image)
         else:
             main_label = Gtk.Label(label=label)
@@ -428,8 +429,7 @@ class RemotePanel(Gtk.Box):
         
         # Main content
         if icon_name:
-            image = Gtk.Image.new_from_icon_name(icon_name)
-            image.set_pixel_size(24)
+            image = self._create_icon(icon_name)
             box.append(image)
         else:
             main_label = Gtk.Label(label="YouTube Search")
@@ -449,6 +449,19 @@ class RemotePanel(Gtk.Box):
         # Store references
         self._search_button = btn
         self._search_shortcut_label = shortcut_label
+
+    def _create_icon(self, icon_name: str) -> Gtk.Image:
+        """Create an icon from a file path or icon name."""
+        if icon_name.endswith(".svg"):
+            path = os.path.join(ICONS_DIR, icon_name)
+            if os.path.exists(path):
+                image = Gtk.Image.new_from_file(path)
+                image.set_pixel_size(24)
+                return image
+        
+        image = Gtk.Image.new_from_icon_name(icon_name)
+        image.set_pixel_size(24)
+        return image
 
 
 

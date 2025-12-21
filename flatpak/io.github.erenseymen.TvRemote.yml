@@ -83,6 +83,8 @@ modules:
       - install -D data/io.github.erenseymen.TvRemote.metainfo.xml /app/share/metainfo/io.github.erenseymen.TvRemote.metainfo.xml
       - install -D data/icons/hicolor/scalable/apps/io.github.erenseymen.TvRemote.svg /app/share/icons/hicolor/scalable/apps/io.github.erenseymen.TvRemote.svg
       - install -D data/io.github.erenseymen.TvRemote.gschema.xml /app/share/glib-2.0/schemas/io.github.erenseymen.TvRemote.gschema.xml
+      - mkdir -p /app/share/io.github.erenseymen.TvRemote/icons/material
+      - cp data/icons/material/*.svg /app/share/io.github.erenseymen.TvRemote/icons/material/
       - glib-compile-schemas /app/share/glib-2.0/schemas
     sources:
       - type: dir
