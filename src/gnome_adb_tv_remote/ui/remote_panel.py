@@ -184,6 +184,14 @@ class RemotePanel(Gtk.Box):
             "KEYCODE_DPAD_RIGHT": "dpad-right",
         }
         
+        # Human-readable names for tooltip
+        direction_names = {
+            "KEYCODE_DPAD_UP": "Up",
+            "KEYCODE_DPAD_DOWN": "Down",
+            "KEYCODE_DPAD_LEFT": "Left",
+            "KEYCODE_DPAD_RIGHT": "Right",
+        }
+        
         for keycode, shortcut_label in self._keycode_shortcut_labels.items():
             action = KEYCODE_TO_ACTION.get(keycode)
             
@@ -193,9 +201,15 @@ class RemotePanel(Gtk.Box):
                 current_keys = current_shortcuts.get(action, [])
                 default_keys = DEFAULT_SHORTCUTS.get(action, [])
                 
+                # Update tooltip to show all shortcuts
+                shortcut_text = get_action_tooltip(action, settings)
+                if shortcut_text:
+                    btn = self._keycode_buttons.get(keycode)
+                    if btn:
+                        btn.set_tooltip_text(f"{direction_names[keycode]}: {shortcut_text}")
+                
                 # Only show shortcut if it differs from default
                 if current_keys != default_keys:
-                    shortcut_text = get_action_tooltip(action, settings)
                     if shortcut_text:
                         shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
                         shortcut_label.set_visible(True)
@@ -212,10 +226,11 @@ class RemotePanel(Gtk.Box):
                 default_keys = DEFAULT_SHORTCUTS.get("dpad-center", [])
                 shortcut_text = get_action_tooltip("dpad-center", settings)
                 
-                # Update Enter button label with new shortcut
-                # Since we use an icon now, we don't update the main label text
-                # Logic kept here if we ever want to revert or handle tooltip
-                pass
+                # Update tooltip to show all shortcuts
+                if shortcut_text:
+                    btn = self._keycode_buttons.get(keycode)
+                    if btn:
+                        btn.set_tooltip_text(f"OK / Select: {shortcut_text}")
                 
                 # Show shortcut label only if changed from default
                 if current_keys != default_keys:
