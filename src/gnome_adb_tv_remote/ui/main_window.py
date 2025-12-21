@@ -141,7 +141,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Preferences button
         prefs_btn = Gtk.Button(icon_name="preferences-system-symbolic")
-        prefs_btn.set_tooltip_text("Preferences")
+        prefs_btn.set_tooltip_text("Configure Shortcuts")
         prefs_btn.connect("clicked", self._on_preferences_clicked)
         header.pack_end(prefs_btn)
 

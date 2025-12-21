@@ -159,24 +159,73 @@ class RemotePanel(Gtk.Box):
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
-        from .preferences_dialog import get_action_tooltip
+        from .preferences_dialog import get_action_tooltip, DEFAULT_SHORTCUTS, _load_shortcuts_dict
 
-        # Direction buttons generally map to arrow keys which is intuitive,
-        # so we don't need to clutter the UI with their shortcuts.
-        exclude_shortcuts = {
-            "KEYCODE_DPAD_UP",
-            "KEYCODE_DPAD_DOWN",
-            "KEYCODE_DPAD_LEFT",
-            "KEYCODE_DPAD_RIGHT",
-            "KEYCODE_DPAD_CENTER",
+        # Load current shortcuts to compare with defaults
+        current_shortcuts = _load_shortcuts_dict(settings)
+
+        # Mapping from keycode to action for direction buttons
+        direction_keycodes = {
+            "KEYCODE_DPAD_UP": "dpad-up",
+            "KEYCODE_DPAD_DOWN": "dpad-down",
+            "KEYCODE_DPAD_LEFT": "dpad-left",
+            "KEYCODE_DPAD_RIGHT": "dpad-right",
         }
         
         for keycode, shortcut_label in self._keycode_shortcut_labels.items():
-            if keycode in exclude_shortcuts:
-                shortcut_label.set_visible(False)
+            action = KEYCODE_TO_ACTION.get(keycode)
+            
+            # Special handling for direction buttons: only show if changed from default
+            if keycode in direction_keycodes:
+                action = direction_keycodes[keycode]
+                current_keys = current_shortcuts.get(action, [])
+                default_keys = DEFAULT_SHORTCUTS.get(action, [])
+                
+                # Only show shortcut if it differs from default
+                if current_keys != default_keys:
+                    shortcut_text = get_action_tooltip(action, settings)
+                    if shortcut_text:
+                        shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
+                        shortcut_label.set_visible(True)
+                    else:
+                        shortcut_label.set_text("")
+                        shortcut_label.set_visible(False)
+                else:
+                    shortcut_label.set_visible(False)
+                continue
+            
+            # Special handling for Enter (dpad-center): update button label if changed
+            if keycode == "KEYCODE_DPAD_CENTER":
+                current_keys = current_shortcuts.get("dpad-center", [])
+                default_keys = DEFAULT_SHORTCUTS.get("dpad-center", [])
+                shortcut_text = get_action_tooltip("dpad-center", settings)
+                
+                # Update Enter button label with new shortcut
+                btn = self._keycode_buttons.get(keycode)
+                if btn:
+                    box = btn.get_child()
+                    if box and isinstance(box, Gtk.Box):
+                        # Find the main label (first child that's a Label)
+                        for child in list(box):
+                            if isinstance(child, Gtk.Label) and child != shortcut_label:
+                                if shortcut_text:
+                                    child.set_markup(f"<b>{shortcut_text}</b>")
+                                else:
+                                    child.set_markup("<b>Enter</b>")
+                                break
+                
+                # Show shortcut label only if changed from default
+                if current_keys != default_keys:
+                    if shortcut_text:
+                        shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
+                        shortcut_label.set_visible(True)
+                    else:
+                        shortcut_label.set_visible(False)
+                else:
+                    shortcut_label.set_visible(False)
                 continue
 
-            action = KEYCODE_TO_ACTION.get(keycode)
+            # Standard buttons: always show shortcut
             if action:
                 shortcut_text = get_action_tooltip(action, settings)
                 if shortcut_text:

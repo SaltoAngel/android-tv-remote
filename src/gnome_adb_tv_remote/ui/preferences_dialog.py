@@ -239,7 +239,7 @@ class PreferencesDialog(Adw.Dialog):
         self._shortcut_buttons: dict[str, ShortcutButton] = {}
         self._shortcuts = self._load_shortcuts()
 
-        self.set_title("Preferences")
+        self.set_title("Configure Shortcuts")
         self.set_content_width(450)
         self.set_content_height(600)
 
