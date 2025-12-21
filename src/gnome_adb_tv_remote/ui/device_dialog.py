@@ -25,6 +25,7 @@ from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 from ..core.network_info import get_ipv4_interface_networks  # noqa: E402
 from ..core.scanner import HostFound, ScanProgress, SubnetScanner  # noqa: E402
+from ..core.adb_client import AdbTcpClient  # noqa: E402
 
 if TYPE_CHECKING:
     from .main_window import MainWindow
@@ -55,6 +56,13 @@ class DeviceDialog(Adw.Window):
         self._found_ips: set[str] = set()
         self._discovered_devices: list[dict[str, str | float | None]] = []
         self._device_rows: dict[str, Adw.ActionRow] = {}
+        
+        # Pairing state tracking
+        self._pairing_in_progress = False
+        self._pairing_ip: str | None = None
+        self._pairing_timer_id: int | None = None
+        self._pairing_button: Gtk.Button | None = None
+        self._ip_entry_button: Gtk.Button | None = None
 
         self._build_ui()
         self._load_discovered_devices()
@@ -66,6 +74,9 @@ class DeviceDialog(Adw.Window):
         self.add_controller(key_controller)
 
     def _on_close_request(self, *_args) -> bool:
+        # Reset pairing state if in progress
+        if self._pairing_in_progress:
+            self._reset_pairing_state()
         self.hide()
         return True
 
@@ -141,10 +152,10 @@ class DeviceDialog(Adw.Window):
 
         ip_row.append(self._ip_entry)
 
-        connect_btn = Gtk.Button(label="Connect")
-        connect_btn.add_css_class("suggested-action")
-        connect_btn.connect("clicked", self._on_connect_clicked)
-        ip_row.append(connect_btn)
+        self._ip_entry_button = Gtk.Button(label="Connect")
+        self._ip_entry_button.add_css_class("suggested-action")
+        self._ip_entry_button.connect("clicked", self._on_connect_clicked)
+        ip_row.append(self._ip_entry_button)
         content.append(ip_row)
 
 
@@ -177,8 +188,7 @@ class DeviceDialog(Adw.Window):
             self._parent._toast("Invalid IP address")
             return
 
-        self._parent._connect_ip_address(ip)
-        self.close()
+        self._start_pairing_check(ip, self._ip_entry_button)
 
     def _on_scan_clicked(self, *_args) -> None:
         if self._scan_in_progress:
@@ -268,7 +278,7 @@ class DeviceDialog(Adw.Window):
 
         btn = Gtk.Button(label="Connect")
         btn.add_css_class("suggested-action")
-        btn.connect("clicked", lambda *_: self._connect_from_row(ip))
+        btn.connect("clicked", lambda *_, b=btn: self._connect_from_row(ip, b))
         row.add_suffix(btn)
         row.set_activatable_widget(btn)
 
@@ -279,9 +289,139 @@ class DeviceDialog(Adw.Window):
 
 
 
-    def _connect_from_row(self, ip: str) -> None:
-        self._parent._connect_ip_address(ip)
-        self.close()
+    def _connect_from_row(self, ip: str, btn: Gtk.Button) -> None:
+        self._start_pairing_check(ip, btn)
+
+    def _start_pairing_check(self, ip: str, btn: Gtk.Button) -> None:
+        """Start the pairing check flow for the given IP."""
+        if self._pairing_in_progress:
+            self._parent._toast("Already pairing with another device")
+            return
+
+        self._pairing_in_progress = True
+        self._pairing_ip = ip
+        self._pairing_button = btn
+
+        # Change button to "Pairing" state
+        btn.set_label("Pairing")
+        btn.set_sensitive(False)
+        btn.remove_css_class("suggested-action")
+        btn.add_css_class("accent")
+
+        # First, trigger a connection attempt to show the pairing dialog on the TV
+        def trigger_connection() -> None:
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=2.0)
+                client.connect()
+            except Exception:
+                # Connection will fail if not paired, that's expected
+                pass
+            # Start the pairing status checks after attempting connection
+            GLib.idle_add(self._start_pairing_timer)
+
+        thread = threading.Thread(target=trigger_connection, daemon=True)
+        thread.start()
+
+    def _start_pairing_timer(self) -> None:
+        """Start the periodic pairing status timer."""
+        if not self._pairing_in_progress:
+            return
+        # Start checking pairing status every 1 second
+        self._pairing_timer_id = GLib.timeout_add(1000, self._check_pairing_status)
+        # Also do an immediate check
+        self._check_pairing_status()
+
+    def _check_pairing_status(self) -> bool:
+        """Check if the device is paired. Called periodically."""
+        if not self._pairing_in_progress or not self._pairing_ip:
+            return False  # Stop the timer
+
+        ip = self._pairing_ip
+
+        def check_paired() -> None:
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=2.0)
+                is_paired = client.is_paired_silent()
+            except Exception:
+                is_paired = False
+
+            GLib.idle_add(self._on_pairing_check_result, is_paired)
+
+        thread = threading.Thread(target=check_paired, daemon=True)
+        thread.start()
+
+        return True  # Continue the timer
+
+    def _on_pairing_check_result(self, is_paired: bool) -> None:
+        """Handle the result of a pairing check."""
+        if not self._pairing_in_progress:
+            return
+
+        if is_paired:
+            self._on_pairing_complete()
+
+    def _on_pairing_complete(self) -> None:
+        """Called when the device is successfully paired."""
+        if not self._pairing_button or not self._pairing_ip:
+            return
+
+        # Stop the timer
+        if self._pairing_timer_id:
+            GLib.source_remove(self._pairing_timer_id)
+            self._pairing_timer_id = None
+
+        # Update button to "Paired" state
+        self._pairing_button.set_label("Paired")
+        self._pairing_button.remove_css_class("accent")
+        self._pairing_button.add_css_class("success")
+
+        # Connect silently in the background
+        ip = self._pairing_ip
+        
+        def on_connect_done() -> None:
+            # Close the dialog when connection is established
+            # We need to check if the device is actually connected
+            if self._parent._adb and self._parent._adb.connected:
+                self.close()
+            else:
+                # If connection failed, reset the button
+                self._reset_pairing_state()
+
+        # Use _connect_ip with silent=True
+        self._parent._connect_ip(ip, silent=True)
+        
+        # Monitor connection status - check every 500ms for up to 10 seconds
+        self._connection_check_count = 0
+        
+        def check_connection() -> bool:
+            self._connection_check_count += 1
+            if self._parent._adb and self._parent._adb.connected:
+                self._reset_pairing_state()
+                self.close()
+                return False
+            if self._connection_check_count >= 20:  # 10 seconds timeout
+                self._reset_pairing_state()
+                return False
+            return True
+        
+        GLib.timeout_add(500, check_connection)
+
+    def _reset_pairing_state(self) -> None:
+        """Reset the pairing state to allow new pairing attempts."""
+        if self._pairing_timer_id:
+            GLib.source_remove(self._pairing_timer_id)
+            self._pairing_timer_id = None
+
+        if self._pairing_button:
+            self._pairing_button.set_label("Connect")
+            self._pairing_button.set_sensitive(True)
+            self._pairing_button.remove_css_class("accent")
+            self._pairing_button.remove_css_class("success")
+            self._pairing_button.add_css_class("suggested-action")
+
+        self._pairing_in_progress = False
+        self._pairing_ip = None
+        self._pairing_button = None
 
     def _on_scan_finished_ui(self, cancelled: bool) -> None:
         self._set_scanning(False)
