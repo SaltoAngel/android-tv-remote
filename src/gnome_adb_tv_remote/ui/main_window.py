@@ -137,6 +137,12 @@ class MainWindow(Adw.ApplicationWindow):
         devices_btn.connect("clicked", self._on_devices_clicked)
         header.pack_start(devices_btn)
 
+        # Info button in top bar
+        info_btn = Gtk.Button(icon_name="help-about-symbolic")
+        info_btn.set_tooltip_text("Instructions")
+        info_btn.connect("clicked", self._on_info_clicked)
+        header.pack_start(info_btn)
+
         # Power button in header bar
         self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
         self._power_button.add_css_class("power-button")
@@ -163,11 +169,6 @@ class MainWindow(Adw.ApplicationWindow):
         prefs_btn.connect("clicked", self._on_preferences_clicked)
         header.pack_end(prefs_btn)
 
-        # Info button
-        info_btn = Gtk.Button(icon_name="help-about-symbolic")
-        info_btn.set_tooltip_text("Instructions")
-        info_btn.connect("clicked", self._on_info_clicked)
-        header.pack_end(info_btn)
 
         # Content (remote)
         self._remote_panel = RemotePanel()
