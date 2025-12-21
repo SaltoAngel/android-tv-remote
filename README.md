@@ -27,16 +27,16 @@ All shortcuts are configurable through the Preferences dialog.
 
 | Key | Action |
 | --- | --- |
-| Arrow Keys | Navigate (Up/Down/Left/Right) |
-| Enter | OK / Select |
-| Esc | Back |
-| Home | Home |
-| Backspace | Menu |
+| Arrow Keys / W A S D | Navigate (Up/Down/Left/Right) |
+| Enter / E | OK / Select |
+| Esc / Q | Back |
+| H | Home |
+| I | Menu |
 | Space | Play/Pause |
 | M | Mute |
-| P | Power |
-| A | Apps |
-| S | Search (YouTube) |
+| Delete | Power |
+| R | Apps |
+| F | Search (YouTube) |
 | K | Focus Keyboard |
 | + or . | Volume Up |
 | - or , | Volume Down |

@@ -37,7 +37,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "play-pause": ["space"],
     "apps": ["r"],
     "focus-keyboard": ["k"],
-    "search": ["s"],
+    "search": ["f"],
 }
 
 # Action to ADB keycode mapping
