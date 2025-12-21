@@ -33,6 +33,7 @@ from .preferences_dialog import (  # noqa: E402
     get_search_keys,
 )
 from .remote_panel import RemotePanel  # noqa: E402
+from .info_dialog import InfoDialog  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
         self._preferences_dialog: PreferencesDialog | None = None
+        self._info_dialog: InfoDialog | None = None
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erenseymen.TvRemote")
@@ -161,6 +163,12 @@ class MainWindow(Adw.ApplicationWindow):
         prefs_btn.connect("clicked", self._on_preferences_clicked)
         header.pack_end(prefs_btn)
 
+        # Info button
+        info_btn = Gtk.Button(icon_name="help-about-symbolic")
+        info_btn.set_tooltip_text("Instructions")
+        info_btn.connect("clicked", self._on_info_clicked)
+        header.pack_end(info_btn)
+
         # Content (remote)
         self._remote_panel = RemotePanel()
         toolbar_view.set_content(self._remote_panel)
@@ -185,6 +193,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self._preferences_dialog is None:
             self._preferences_dialog = PreferencesDialog(self)
         self._preferences_dialog.present(self)
+
+    def _on_info_clicked(self, *_args) -> None:
+        if self._info_dialog is None:
+            self._info_dialog = InfoDialog(self)
+        self._info_dialog.present()
 
     def _auto_connect_last_ip(self) -> None:
         """Load the last successfully connected IP address from settings and auto-connect."""
