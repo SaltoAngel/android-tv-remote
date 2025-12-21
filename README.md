@@ -12,10 +12,8 @@ A GNOME (Libadwaita) application to control Android TV devices over the network 
 
 ## Usage
 
-<div align="center">
-  <video src="screenshots/usage.mkv" width="600" controls></video>
-</div>
 
+[▶️ Watch Usage Demo](screenshots/usage.mp4)
 
 ## Features
 
