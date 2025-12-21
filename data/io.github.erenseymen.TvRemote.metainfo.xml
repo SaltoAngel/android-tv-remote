@@ -83,19 +83,22 @@
   </recommends>
   
   <releases>
-    <release version="0.1.0" date="2025-12-18">
+    <release version="1.0.0" date="2025-12-21">
       <description>
-        <p>Initial release with core features:</p>
+        <p>Stable release with improved features and UI enhancements:</p>
         <ul>
-          <li>Network scanning for Android TV devices</li>
-          <li>ADB-over-TCP connection with RSA authentication</li>
-          <li>Low-latency input via scrcpy-server</li>
-          <li>Full remote control interface with D-pad, volume, and media controls</li>
-          <li>Keyboard shortcuts for all functions</li>
-          <li>Text input support</li>
-          <li>Auto-connect to last device</li>
+          <li>Added new remote actions: Previous Track, Next Track, Google Assistant, and Captions/Subtitles</li>
+          <li>Added support for YouTube Rewind shortcut</li>
+          <li>Refined user interface with more compact and modern button designs</li>
+          <li>Improved overall visual aesthetics and premium feel</li>
+          <li>Enhanced keyboard shortcut support</li>
+          <li>Various bug fixes and performance improvements</li>
         </ul>
-      </description>
-    </release>
-  </releases>
+      </release>
+      <release version="0.1.0" date="2025-12-18">
+        <description>
+          <p>Initial release with core features</p>
+        </description>
+      </release>
+    </releases>
 </component>

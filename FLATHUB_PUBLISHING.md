@@ -104,7 +104,7 @@ flatpak run io.github.erenseymen.TvRemote
      sources:
        - type: git
          url: https://github.com/erenseymen/android-tv-remote.git
-         tag: v0.1.0  # Use a release tag
+         tag: v1.0.0  # Use a release tag
    ```
 
 6. Commit and push:
