@@ -137,7 +137,7 @@ class RemotePanel(Gtk.Box):
         # System
         self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
         self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="open-menu-symbolic")
+        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="view-list-symbolic")
 
         # Volume
         self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="audio-volume-low-symbolic")
