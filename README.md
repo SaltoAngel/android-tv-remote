@@ -101,10 +101,6 @@ android-tv-remote/
 - **rsa** / **pyasn1** - RSA key generation
 - **scrcpy-server** (bundled) - Low-latency input injection
 
-## Contributing
-
-Contributions are welcome! Please open an issue to discuss proposed changes before submitting a pull request.
-
 ## License
 
 This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](LICENSE) file for details.
