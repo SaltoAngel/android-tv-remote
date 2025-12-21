@@ -451,11 +451,18 @@ class RemotePanel(Gtk.Box):
         self._search_shortcut_label = shortcut_label
 
     def _create_icon(self, icon_name: str) -> Gtk.Image:
-        """Create an icon from a file path or icon name."""
+        """Create an icon from a file path or icon name.
+        
+        Uses Gio.FileIcon to load SVG files as symbolic icons,
+        which allows them to adapt their color to the current theme.
+        """
         if icon_name.endswith(".svg"):
             path = os.path.join(ICONS_DIR, icon_name)
             if os.path.exists(path):
-                image = Gtk.Image.new_from_file(path)
+                # Load as GIcon to get proper symbolic icon theming
+                file = Gio.File.new_for_path(path)
+                gicon = Gio.FileIcon.new(file)
+                image = Gtk.Image.new_from_gicon(gicon)
                 image.set_pixel_size(24)
                 return image
         
