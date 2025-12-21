@@ -135,21 +135,21 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="keyboard_arrow_down-symbolic.svg")
 
         # System
-        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="arrow_back-symbolic.svg")
-        self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="home-symbolic.svg")
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="menu-symbolic.svg")
+        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
+        self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
+        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="open-menu-symbolic")
 
         # Volume
-        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="volume_down-symbolic.svg")
-        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="volume_off-symbolic.svg")
-        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="volume_up-symbolic.svg")
+        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="audio-volume-low-symbolic")
+        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="audio-volume-muted-symbolic")
+        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
 
         # Media
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="apps-symbolic.svg")
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["play_arrow-symbolic.svg", "pause-symbolic.svg"])
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 5, icon_name="view-app-grid-symbolic")
+        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
         
         # Search button (sends text "s" for YouTube search) - moved to row 5, col 2
-        self._add_search_button(2, 5, icon_name="search-symbolic.svg")
+        self._add_search_button(2, 5, icon_name="system-search-symbolic")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")

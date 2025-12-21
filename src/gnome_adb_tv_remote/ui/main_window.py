@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import os
 
 import gi
 
@@ -36,17 +35,6 @@ from .preferences_dialog import (  # noqa: E402
 from .remote_panel import RemotePanel  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-# Path to material icons
-def get_icons_dir():
-    # Check Flatpak path first
-    flatpak_path = "/app/share/io.github.erenseymen.TvRemote/icons/material"
-    if os.path.exists(flatpak_path):
-        return flatpak_path
-    # Fallback to local development path
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/icons/material"))
-
-ICONS_DIR = get_icons_dir()
 
 
 
@@ -148,15 +136,7 @@ class MainWindow(Adw.ApplicationWindow):
         header.pack_start(devices_btn)
 
         # Power button in header bar
-        self._power_button = Gtk.Button()
-        power_icon_path = os.path.join(ICONS_DIR, "power_settings_new-symbolic.svg")
-        if os.path.exists(power_icon_path):
-             img = Gtk.Image.new_from_file(power_icon_path)
-             # Header bar buttons usually don't need explicit pixel size but let's be safe or rely on theme
-             img.set_pixel_size(16)
-             self._power_button.set_child(img)
-        else:
-             self._power_button.set_icon_name("system-shutdown-symbolic")
+        self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
         
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
         header.pack_start(self._power_button)
