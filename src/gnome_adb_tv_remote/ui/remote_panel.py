@@ -434,7 +434,7 @@ class RemotePanel(Gtk.Box):
         btn.add_css_class("remote-button")
         btn.set_hexpand(True)
         btn.set_vexpand(True)
-        btn.set_tooltip_text("YouTube Search")
+        btn.set_tooltip_text("Find (YouTube only)")
         btn.connect("clicked", lambda *_: self._on_text and self._on_text("s"))
         
         # Create vertical box for label and shortcut
@@ -447,7 +447,7 @@ class RemotePanel(Gtk.Box):
             image = self._create_icon(icon_name)
             box.append(image)
         else:
-            main_label = Gtk.Label(label="YouTube Search")
+            main_label = Gtk.Label(label="Find (YouTube only)")
             box.append(main_label)
         
         # Shortcut label (bold, same as Enter button)

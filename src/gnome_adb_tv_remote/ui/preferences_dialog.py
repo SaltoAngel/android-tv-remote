@@ -77,7 +77,7 @@ ACTION_LABELS: dict[str, str] = {
     "play-pause": "Play/Pause",
     "apps": "Apps",
     "focus-keyboard": "Focus Keyboard",
-    "search": "Search (YouTube)",
+    "search": "Find (YouTube only)",
 }
 
 # Category groupings
