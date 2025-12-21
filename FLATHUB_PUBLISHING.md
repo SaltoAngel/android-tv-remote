@@ -77,17 +77,12 @@ flatpak run io.github.erenseymen.TvRemote
    git checkout -b new-pr
    ```
 
-3. Create a directory for your app:
+3. Copy your manifest to the root directory (Flathub requires the manifest in the repo root, not in a subdirectory):
    ```bash
-   mkdir io.github.erenseymen.TvRemote
+   cp /path/to/android-tv-remote/flatpak/io.github.erenseymen.TvRemote.yml io.github.erenseymen.TvRemote.yml
    ```
 
-4. Copy your manifest:
-   ```bash
-   cp /path/to/android-tv-remote/flatpak/io.github.erenseymen.TvRemote.yml io.github.erenseymen.TvRemote/io.github.erenseymen.TvRemote.yml
-   ```
-
-5. **Important**: Modify the manifest for Flathub:
+4. **Important**: Modify the manifest for Flathub:
    - Ensure `app-id:` is `io.github.erenseymen.TvRemote`
    - Change the source from `type: dir` to `type: git` pointing to your GitHub repo:
    
@@ -107,14 +102,14 @@ flatpak run io.github.erenseymen.TvRemote
          tag: v1.0.0  # Use a release tag
    ```
 
-6. Commit and push:
+5. Commit and push:
    ```bash
    git add .
    git commit -m "Add io.github.erenseymen.TvRemote"
    git push origin new-pr
    ```
 
-7. Open a Pull Request on https://github.com/flathub/flathub
+6. Open a Pull Request on https://github.com/flathub/flathub
 
 ## Step 7: Respond to Review
 
