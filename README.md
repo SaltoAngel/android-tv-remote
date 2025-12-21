@@ -10,6 +10,12 @@ A GNOME (Libadwaita) application to control Android TV devices over the network 
 | :---: | :---: |
 | ![Light Mode](screenshots/light.png) | ![Dark Mode](screenshots/dark.png) |
 
+## Usage
+
+<div align="center">
+  <video src="screenshots/usage.m4v" width="600" controls></video>
+</div>
+
 
 ## Features
 
