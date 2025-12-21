@@ -14,6 +14,10 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
+import os
+os.environ["MESA_DEBUG"] = "silent"
+os.environ["GSK_RENDERER"] = "ngl"
+
 from gi.repository import Adw, Gio, GLib  # noqa: E402
 
 from .ui.main_window import MainWindow  # noqa: E402

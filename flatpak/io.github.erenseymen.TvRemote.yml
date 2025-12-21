@@ -9,6 +9,8 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+  - --env=MESA_DEBUG=silent
+  - --env=GSK_RENDERER=ngl
 
 build-options:
   env:
