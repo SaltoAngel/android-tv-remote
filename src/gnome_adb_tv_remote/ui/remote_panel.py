@@ -198,8 +198,6 @@ class RemotePanel(Gtk.Box):
             # Special handling for direction buttons: only show if changed from default
             if keycode in direction_keycodes:
                 action = direction_keycodes[keycode]
-                current_keys = current_shortcuts.get(action, [])
-                default_keys = DEFAULT_SHORTCUTS.get(action, [])
                 
                 # Update tooltip to show all shortcuts
                 shortcut_text = get_action_tooltip(action, settings)
@@ -208,22 +206,12 @@ class RemotePanel(Gtk.Box):
                     if btn:
                         btn.set_tooltip_text(f"{direction_names[keycode]}: {shortcut_text}")
                 
-                # Only show shortcut if it differs from default
-                if current_keys != default_keys:
-                    if shortcut_text:
-                        shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
-                        shortcut_label.set_visible(True)
-                    else:
-                        shortcut_label.set_text("")
-                        shortcut_label.set_visible(False)
-                else:
-                    shortcut_label.set_visible(False)
+                # Never show shortcut label on direction buttons (UI requirement)
+                shortcut_label.set_visible(False)
                 continue
             
             # Special handling for Enter (dpad-center): update button label if changed
             if keycode == "KEYCODE_DPAD_CENTER":
-                current_keys = current_shortcuts.get("dpad-center", [])
-                default_keys = DEFAULT_SHORTCUTS.get("dpad-center", [])
                 shortcut_text = get_action_tooltip("dpad-center", settings)
                 
                 # Update tooltip to show all shortcuts
@@ -232,15 +220,8 @@ class RemotePanel(Gtk.Box):
                     if btn:
                         btn.set_tooltip_text(f"OK / Select: {shortcut_text}")
                 
-                # Show shortcut label only if changed from default
-                if current_keys != default_keys:
-                    if shortcut_text:
-                        shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
-                        shortcut_label.set_visible(True)
-                    else:
-                        shortcut_label.set_visible(False)
-                else:
-                    shortcut_label.set_visible(False)
+                # Never show shortcut label on center button (UI requirement)
+                shortcut_label.set_visible(False)
                 continue
 
             # Standard buttons: always show shortcut
