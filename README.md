@@ -1,4 +1,4 @@
-# TV Remote for Linux
+# TV Remote
 
 A GNOME (Libadwaita) application to control Android TV devices over the network via ADB.
 
