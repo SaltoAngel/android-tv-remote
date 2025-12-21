@@ -292,7 +292,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._remote_panel.update_device_info(device_info, ip)
         self._save_last_ip(ip)
         if not self._connect_silent:
-            self._toast(f"Connected to {ip}")
+            self._toast(f"Successfully connected to {ip}!")
         self._connect_silent = False
 
         # Start scrcpy in background for low-latency input
@@ -370,7 +370,7 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
             self._adb = None
         self._set_connected(False)
-        self._toast("Disconnected")
+        self._toast("Disconnected from device.")
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
@@ -422,14 +422,14 @@ class MainWindow(Adw.ApplicationWindow):
         """
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
-            self._toast("scrcpy-server not connected")
+            self._toast("Device is not connected.")
             return
 
         try:
             scrcpy.send_keycode(keycode)
         except Exception as e:
             logger.error(f"scrcpy keyevent failed: {e}")
-            self._toast(f"Keyevent failed: {e}")
+            self._toast("Failed to send command to TV.")
 
     def _on_remote_text(self, text: str) -> None:
         """Send text input to the device using scrcpy-server.
@@ -438,14 +438,14 @@ class MainWindow(Adw.ApplicationWindow):
         """
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
-            self._toast("scrcpy-server not connected")
+            self._toast("Device is not connected.")
             return
 
         try:
             scrcpy.send_text(text)
         except Exception as e:
             logger.error(f"scrcpy text input failed: {e}")
-            self._toast(f"Send text failed: {e}")
+            self._toast("Failed to send text input to TV.")
 
     def _paste_clipboard(self) -> None:
         """Read text from clipboard and send it to the device."""
