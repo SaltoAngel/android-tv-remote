@@ -277,6 +277,7 @@ class DeviceDialog(Adw.Window):
         )
 
         btn = Gtk.Button(label="Connect")
+        btn.set_valign(Gtk.Align.CENTER)
         btn.add_css_class("suggested-action")
         btn.connect("clicked", lambda *_, b=btn: self._connect_from_row(ip, b))
         row.add_suffix(btn)
