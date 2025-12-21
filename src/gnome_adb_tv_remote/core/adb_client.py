@@ -44,6 +44,11 @@ class AdbTcpClient:
     def host(self) -> str:
         return self._host
 
+    @property
+    def connected(self) -> bool:
+        """Check if the client is currently connected to a device."""
+        return self._device is not None
+
     def connect(self) -> None:
         """Connect and authenticate to ADB-over-TCP.
 
