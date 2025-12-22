@@ -107,20 +107,10 @@ class AdbTcpClient:
         """Retrieve basic device information via getprop.
 
         This is blocking and should be run in a worker thread.
-        Uses a single shell command to batch all getprop calls for better performance.
         """
-        # Batch all getprop calls into a single shell command (1 round trip instead of 3)
-        result = self.shell(
-            "echo $(getprop ro.product.manufacturer);"
-            "echo $(getprop ro.product.model);"
-            "echo $(getprop ro.build.version.release)"
-        ).stdout.strip()
-        
-        # Parse the output (3 lines)
-        lines = result.split('\n')
-        manufacturer = lines[0].strip() if len(lines) > 0 else ""
-        model = lines[1].strip() if len(lines) > 1 else ""
-        version = lines[2].strip() if len(lines) > 2 else ""
+        manufacturer = self.shell("getprop ro.product.manufacturer").stdout.strip()
+        model = self.shell("getprop ro.product.model").stdout.strip()
+        version = self.shell("getprop ro.build.version.release").stdout.strip()
 
         return DeviceInfo(
             manufacturer=manufacturer or "Unknown",
