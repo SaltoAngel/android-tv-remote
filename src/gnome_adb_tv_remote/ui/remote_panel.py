@@ -22,7 +22,7 @@ from ..core.adb_client import DeviceInfo  # noqa: E402
 # Path to material icons
 def get_icons_dir():
     # Check Flatpak path first
-    flatpak_path = "/app/share/io.github.erenseymen.android_tv_remote/icons/material"
+    flatpak_path = "/app/share/io.github.erenseymen.android-tv-remote/icons/material"
     if os.path.exists(flatpak_path):
         return flatpak_path
     # Fallback to local development path

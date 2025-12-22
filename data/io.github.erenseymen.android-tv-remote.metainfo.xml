@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.erenseymen.android_tv_remote</id>
+  <id>io.github.erenseymen.android-tv-remote</id>
   <name>TV Remote</name>
   <summary>Control an Android TV over the network via ADB</summary>
   
@@ -35,7 +35,7 @@
     </p>
   </description>
   
-  <launchable type="desktop-id">io.github.erenseymen.android_tv_remote.desktop</launchable>
+  <launchable type="desktop-id">io.github.erenseymen.android-tv-remote.desktop</launchable>
   
   <screenshots>
     <screenshot type="default">

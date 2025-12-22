@@ -55,10 +55,10 @@ All shortcuts are configurable through the Preferences dialog.
 
 ```bash
 # Build and install locally
-flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erenseymen.android_tv_remote.yml
+flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erenseymen.android-tv-remote.yml
 
 # Run
-flatpak run io.github.erenseymen.android_tv_remote
+flatpak run io.github.erenseymen.android-tv-remote
 ```
 
 ### Requirements
