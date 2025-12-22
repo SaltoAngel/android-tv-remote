@@ -291,8 +291,8 @@ class ScrcpyServerController:
         
         # Give the server a moment to start and create its socket
         # Give the server a moment to start and create its socket
-        # minimal sleep to let process spawn
-        time.sleep(0.1)
+        # Increasing to 1.0s for stability on first launch / slow devices
+        time.sleep(1.0)
         
         # Check if it crashed immediately
         if self._shell_process.poll() is not None:
