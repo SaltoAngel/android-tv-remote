@@ -407,20 +407,25 @@ class MainWindow(Adw.ApplicationWindow):
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
 
+        # Prepare lower-case keyval for fallback (handling Caps Lock)
+        lower_keyval = Gdk.keyval_to_lower(keyval)
+
         # Handle focus keyboard shortcut (configurable)
-        if keyval in self._focus_keyboard_keys:
+        if keyval in self._focus_keyboard_keys or lower_keyval in self._focus_keyboard_keys:
             self._remote_panel.focus_keyboard()
             return True
 
         # Handle search shortcut (sends text "s" for YouTube search, then activates keyboard)
-        if keyval in self._search_keys:
+        if keyval in self._search_keys or lower_keyval in self._search_keys:
             self._on_remote_text("s")
             self._remote_panel.focus_keyboard()
             return True
 
         # Handle keyboard shortcuts
-        if keyval in self._key_map:
-            keycode = self._key_map[keyval]
+        # Check original keyval first, then fallback to lower-case (ignores Caps Lock)
+        keycode = self._key_map.get(keyval) or self._key_map.get(lower_keyval)
+
+        if keycode:
             # Flash the button to show visual feedback
             self._remote_panel.flash_button(keycode)
             # Send the key event
