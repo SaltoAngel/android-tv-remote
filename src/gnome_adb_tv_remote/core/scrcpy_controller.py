@@ -252,7 +252,8 @@ class ScrcpyServerController:
         subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "pkill", "-f", "scrcpy-server"], capture_output=True, env=env, timeout=5)
         # Also try killall just in case pkill isn't available
         subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "killall", "scrcpy-server"], capture_output=True, env=env, timeout=5)
-        time.sleep(0.5)
+        # Brief wait for process cleanup (reduced from 0.5s)
+        time.sleep(0.1)
 
         # Arguments for v3.1: tunnel_forward=true means it listens on device abstract socket 'scrcpy'
         # We don't background with '&' here; we use Popen to keep it alive as a child process.
@@ -273,13 +274,24 @@ class ScrcpyServerController:
             stdin=subprocess.PIPE,
         )
         
-        # Give the server a moment to start and create its socket
-        time.sleep(1.5)
-        
-        # Check if it crashed immediately
-        if self._shell_process.poll() is not None:
-            err = self._shell_process.stderr.read().decode() if self._shell_process.stderr else "Unknown error"
-            raise ScrcpyError(f"scrcpy-server exited immediately: {err}")
+        # Poll for server readiness instead of fixed sleep (max 2s, typically ~0.3-0.5s)
+        max_wait = 2.0
+        poll_interval = 0.1
+        waited = 0.0
+        while waited < max_wait:
+            # Check if process crashed
+            if self._shell_process.poll() is not None:
+                err = self._shell_process.stderr.read().decode() if self._shell_process.stderr else "Unknown error"
+                raise ScrcpyError(f"scrcpy-server exited immediately: {err}")
+            
+            # Brief wait before next check
+            time.sleep(poll_interval)
+            waited += poll_interval
+            
+            # Server is ready when process is still running after initial startup
+            # We'll verify actual socket availability in _setup_connection
+            if waited >= 0.3:  # Minimum startup time
+                break
             
         self._server_started = True
 
@@ -305,21 +317,22 @@ class ScrcpyServerController:
         if result.returncode != 0:
             raise ScrcpyError(f"Failed to setup port forward: {result.stderr.decode()}")
 
-        # Give forwarding a moment to establish
-        time.sleep(0.5)
-
-        # Connect to the forwarded port
+        # Connect to the forwarded port with exponential backoff
+        # Start with short delays (0.05s) and increase, max total wait ~2s
         self._control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._control_socket.settimeout(5.0)
+        self._control_socket.settimeout(2.0)
 
-        # Retry connection a few times as server may take a moment
-        for attempt in range(5):
+        max_attempts = 8
+        base_delay = 0.05  # Start with 50ms delay
+        for attempt in range(max_attempts):
             try:
                 self._control_socket.connect(("127.0.0.1", self._forward_port))
                 break
-            except (ConnectionRefusedError, socket.timeout):
-                if attempt < 4:
-                    time.sleep(0.5)
+            except (ConnectionRefusedError, socket.timeout, OSError):
+                if attempt < max_attempts - 1:
+                    # Exponential backoff: 0.05, 0.1, 0.2, 0.4, 0.5, 0.5, 0.5 (capped)
+                    delay = min(base_delay * (2 ** attempt), 0.5)
+                    time.sleep(delay)
                 else:
                     raise ScrcpyError("Could not connect to scrcpy-server socket")
 
@@ -370,21 +383,48 @@ class ScrcpyServerController:
             logger.warning(f"Unknown keycode: {keycode_name}")
             return
 
-        # Send key down then key up
-        self._send_key_event(keycode, AKEY_EVENT_ACTION_DOWN)
-        self._send_key_event(keycode, AKEY_EVENT_ACTION_UP)
-
-    def _send_key_event(self, keycode: int, action: int) -> None:
-        """Send a key event control message."""
+        # Check connection once for both events
         if not self._connected or not self._control_socket:
             return
 
+        # Combine key down + key up into a single socket write for better performance
         # Control message format for key event:
         # - type (1 byte): SC_CONTROL_MSG_TYPE_INJECT_KEYCODE = 0
         # - action (1 byte): AKEY_EVENT_ACTION_DOWN=0 or UP=1
         # - keycode (4 bytes, big-endian)
         # - repeat (4 bytes, big-endian)
         # - metastate (4 bytes, big-endian)
+        down_msg = struct.pack(
+            ">BBIII",
+            SC_CONTROL_MSG_TYPE_INJECT_KEYCODE,
+            AKEY_EVENT_ACTION_DOWN,
+            keycode,
+            0,  # repeat
+            0,  # metastate
+        )
+        up_msg = struct.pack(
+            ">BBIII",
+            SC_CONTROL_MSG_TYPE_INJECT_KEYCODE,
+            AKEY_EVENT_ACTION_UP,
+            keycode,
+            0,  # repeat
+            0,  # metastate
+        )
+
+        try:
+            # Single syscall for both events
+            self._control_socket.sendall(down_msg + up_msg)
+        except Exception as e:
+            logger.error(f"Failed to send key event: {e}")
+            self._connected = False
+            if self._on_disconnect:
+                self._on_disconnect()
+
+    def _send_key_event(self, keycode: int, action: int) -> None:
+        """Send a single key event control message (used for individual key actions)."""
+        if not self._connected or not self._control_socket:
+            return
+
         msg = struct.pack(
             ">BBIII",
             SC_CONTROL_MSG_TYPE_INJECT_KEYCODE,

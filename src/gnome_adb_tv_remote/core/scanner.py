@@ -35,7 +35,7 @@ class SubnetScanner:
         self,
         *,
         port: int = 5555,
-        timeout_s: float = 0.35,
+        timeout_s: float = 0.25,  # Reduced from 0.35s for faster scans on local networks
         concurrency: int = 256,
     ) -> None:
         self._port = port
