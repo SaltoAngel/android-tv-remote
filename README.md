@@ -1,6 +1,6 @@
 # TV Remote
 
-A GNOME (Libadwaita) application to control Android TV devices over the network via ADB.
+A GTK-based remote control application for Android TV devices, powered by [scrcpy](https://github.com/Genymobile/scrcpy) and ADB. Control your TV from your Linux desktop with low-latency input, keyboard shortcuts, and an intuitive interface.
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux-green.svg)
