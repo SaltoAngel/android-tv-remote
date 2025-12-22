@@ -233,6 +233,22 @@ class ScrcpyServerController:
         # Use adb_shell for fast, authorized push
         self._adb.device.push(str(local_server), self.DEVICE_SERVER_PATH)
 
+    def _wait_for_device_cli(self, adb: str, env: dict) -> None:
+        """Wait for the device to be recognized by adb CLI as 'device'."""
+        target = f"{self._host}:{self._port}"
+        
+        # Try connecting
+        subprocess.run([adb, "connect", target], capture_output=True, env=env, timeout=5)
+        
+        # Wait up to 5 seconds for status to become 'device'
+        for _ in range(10):
+            res = subprocess.run([adb, "-s", target, "get-state"], capture_output=True, env=env, text=True)
+            if res.returncode == 0 and "device" in res.stdout.strip():
+                return
+            time.sleep(0.5)
+            # Retry connect in case it failed or wasn't tried
+            subprocess.run([adb, "connect", target], capture_output=True, env=env, timeout=5)
+
     def _start_server(self) -> None:
         """Start scrcpy-server on the device."""
         # We use the adb CLI to start the server in a way that we can keep it alive.
@@ -244,8 +260,8 @@ class ScrcpyServerController:
         
         adb = self._find_adb()
         
-        # Ensure CLI is connected
-        subprocess.run([adb, "connect", f"{self._host}:{self._port}"], capture_output=True, env=env, timeout=5)
+        # Ensure CLI is connected to the device
+        self._wait_for_device_cli(adb, env)
 
         # Kill any existing scrcpy-server instances to avoid "Address already in use"
         logger.info("Cleaning up any existing scrcpy-server instances on device...")
