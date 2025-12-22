@@ -2,7 +2,7 @@ app-id: io.github.erenseymen.android-tv-remote
 runtime: org.gnome.Platform
 runtime-version: "49"
 sdk: org.gnome.Sdk
-command: android-tv-remote
+command: tv-remote
 
 finish-args:
   - --share=network

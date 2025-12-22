@@ -51,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv
 
+    GLib.set_prgname("tv-remote")
     Adw.init()
     app = App()
     return int(app.run(argv))
