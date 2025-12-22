@@ -104,10 +104,11 @@ android-tv-remote/
 ## Dependencies
 
 - **PyGObject** (GTK4/Libadwaita) - UI framework
-- **adb-shell** - ADB protocol implementation
-- **psutil** - Network interface discovery
-- **rsa** / **pyasn1** - RSA key generation
-- **scrcpy-server** (bundled) - Low-latency input injection
+- **adb-shell** - Pure Python ADB protocol (connect, auth, shell commands, file push)
+- **android-tools** (adb binary) - Port forwarding and subprocess management for scrcpy
+- **psutil** - Network interface enumeration for device scanning
+- **rsa** / **pyasn1** - RSA key generation (lighter than `cryptography` for Flatpak)
+- **scrcpy-server** (bundled) - Low-latency input injection (~35-70ms)
 
 ## License
 
