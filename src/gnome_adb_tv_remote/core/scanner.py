@@ -97,6 +97,9 @@ class SubnetScanner:
 
                 if res and on_found:
                     on_found(res)
+                
+                # Small sleep to prevent CPU spinning when many results complete rapidly
+                time.sleep(0.01)
         finally:
             # Normal completion: wait for worker threads to finish cleanly.
             ex.shutdown(wait=True, cancel_futures=True)

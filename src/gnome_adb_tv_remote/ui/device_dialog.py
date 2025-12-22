@@ -327,8 +327,8 @@ class DeviceDialog(Adw.Window):
         """Start the periodic pairing status timer."""
         if not self._pairing_in_progress:
             return
-        # Start checking pairing status every 1 second
-        self._pairing_timer_id = GLib.timeout_add(1000, self._check_pairing_status)
+        # Start checking pairing status every 1.5 seconds
+        self._pairing_timer_id = GLib.timeout_add(1500, self._check_pairing_status)
         # Also do an immediate check
         self._check_pairing_status()
 
@@ -391,7 +391,7 @@ class DeviceDialog(Adw.Window):
         # Use _connect_ip with silent=True
         self._parent._connect_ip(ip, silent=True)
         
-        # Monitor connection status - check every 500ms for up to 10 seconds
+        # Monitor connection status - check every 1 second for up to 10 seconds
         self._connection_check_count = 0
         
         def check_connection() -> bool:
@@ -400,12 +400,12 @@ class DeviceDialog(Adw.Window):
                 self._reset_pairing_state()
                 self.close()
                 return False
-            if self._connection_check_count >= 20:  # 10 seconds timeout
+            if self._connection_check_count >= 10:  # 10 seconds timeout
                 self._reset_pairing_state()
                 return False
             return True
         
-        GLib.timeout_add(500, check_connection)
+        GLib.timeout_add(1000, check_connection)
 
     def _reset_pairing_state(self) -> None:
         """Reset the pairing state to allow new pairing attempts."""
