@@ -20,8 +20,8 @@ Thank you for your interest in contributing to TV Remote! This document provides
 Or manually:
 
 ```bash
-flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erenseymen.TvRemote.yml
-flatpak run io.github.erenseymen.TvRemote
+flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erenseymen.android_tv_remote.yml
+flatpak run io.github.erenseymen.android_tv_remote
 ```
 
 ## Code Style
@@ -47,7 +47,7 @@ When reporting issues, please include:
 - Flatpak version
 - Steps to reproduce the issue
 - Expected vs actual behavior
-- Any relevant error messages (check `flatpak run --command=sh io.github.erenseymen.TvRemote` for logs)
+- Any relevant error messages (check `flatpak run --command=sh io.github.erenseymen.android_tv_remote` for logs)
 
 ## Code Organization
 

@@ -1,4 +1,4 @@
-app-id: io.github.erenseymen.TvRemote
+app-id: io.github.erenseymen.android_tv_remote
 runtime: org.gnome.Platform
 runtime-version: "49"
 sdk: org.gnome.Sdk
