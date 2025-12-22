@@ -1,22 +1,29 @@
 """Setup script for android-tv-remote."""
+import os
+import subprocess
 from setuptools import setup
+from setuptools.command.install import install
 
-# Read version and other metadata from pyproject.toml
-# This file only handles data_files installation
+class PostInstallCommand(install):
+    """Post-installation: compile GSettings schemas."""
+    def run(self):
+        install.run(self)
+        # Compile GSettings schemas
+        schema_dir = os.path.join(self.install_data, 'share/glib-2.0/schemas')
+        if os.path.isdir(schema_dir):
+            try:
+                subprocess.run(['glib-compile-schemas', schema_dir], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass  # glib-compile-schemas not available or failed
 
 setup(
     data_files=[
-        # Desktop file
         ("share/applications", ["data/io.github.erenseymen.android_tv_remote.desktop"]),
-        # Metainfo
         ("share/metainfo", ["data/io.github.erenseymen.android_tv_remote.metainfo.xml"]),
-        # Icon
         ("share/icons/hicolor/scalable/apps", [
             "data/icons/hicolor/scalable/apps/io.github.erenseymen.android_tv_remote.svg"
         ]),
-        # GSchema
         ("share/glib-2.0/schemas", ["data/io.github.erenseymen.android_tv_remote.gschema.xml"]),
-        # Material icons
         ("share/io.github.erenseymen.android_tv_remote/icons/material", [
             "data/icons/material/fiber_manual_record-symbolic.svg",
             "data/icons/material/keyboard_arrow_down-symbolic.svg",
@@ -25,5 +32,7 @@ setup(
             "data/icons/material/keyboard_arrow_up-symbolic.svg",
         ]),
     ],
+    cmdclass={
+        'install': PostInstallCommand,
+    },
 )
-
