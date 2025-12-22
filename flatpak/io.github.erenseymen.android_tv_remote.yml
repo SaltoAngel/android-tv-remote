@@ -18,28 +18,11 @@ build-options:
     PYTHONNOUSERSITE: "1"
 
 modules:
-  # Android Platform Tools (adb) - required by scrcpy
+  # Android Platform Tools (adb) - x86_64 only
   - name: android-tools
     buildsystem: simple
     build-commands:
-      - |
-        ARCH=$(uname -m)
-        if [ "$ARCH" = "x86_64" ]; then
-          ADB_PATH="platform-tools/adb"
-        elif [ "$ARCH" = "aarch64" ]; then
-          ADB_PATH="platform-tools/adb"
-        else
-          echo "Unsupported architecture: $ARCH"
-          exit 1
-        fi
-        if [ -f "$ADB_PATH" ]; then
-          install -Dm755 "$ADB_PATH" /app/bin/adb
-        elif [ -f "platform-tools/linux-${ARCH}/adb" ]; then
-          install -Dm755 "platform-tools/linux-${ARCH}/adb" /app/bin/adb
-        else
-          echo "adb binary not found for architecture $ARCH"
-          exit 1
-        fi
+      - install -Dm755 platform-tools/adb /app/bin/adb
     sources:
       - type: archive
         url: https://dl.google.com/android/repository/platform-tools_r35.0.2-linux.zip
