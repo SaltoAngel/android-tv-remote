@@ -252,7 +252,7 @@ class ScrcpyServerController:
         subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "pkill", "-f", "scrcpy-server"], capture_output=True, env=env, timeout=5)
         # Also try killall just in case pkill isn't available
         subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "killall", "scrcpy-server"], capture_output=True, env=env, timeout=5)
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         # Arguments for v3.1: tunnel_forward=true means it listens on device abstract socket 'scrcpy'
         # We don't background with '&' here; we use Popen to keep it alive as a child process.
@@ -274,7 +274,9 @@ class ScrcpyServerController:
         )
         
         # Give the server a moment to start and create its socket
-        time.sleep(1.5)
+        # Give the server a moment to start and create its socket
+        # minimal sleep to let process spawn
+        time.sleep(0.1)
         
         # Check if it crashed immediately
         if self._shell_process.poll() is not None:
@@ -306,20 +308,22 @@ class ScrcpyServerController:
             raise ScrcpyError(f"Failed to setup port forward: {result.stderr.decode()}")
 
         # Give forwarding a moment to establish
-        time.sleep(0.5)
+        # minimal sleep
+        time.sleep(0.1)
 
         # Connect to the forwarded port
         self._control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._control_socket.settimeout(5.0)
 
         # Retry connection a few times as server may take a moment
-        for attempt in range(5):
+        # Changed to polling: 30 attempts * 0.1s = 3.0s max wait (but much faster if ready)
+        for attempt in range(30):
             try:
                 self._control_socket.connect(("127.0.0.1", self._forward_port))
                 break
             except (ConnectionRefusedError, socket.timeout):
-                if attempt < 4:
-                    time.sleep(0.5)
+                if attempt < 29:
+                    time.sleep(0.1)
                 else:
                     raise ScrcpyError("Could not connect to scrcpy-server socket")
 

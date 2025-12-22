@@ -108,9 +108,17 @@ class AdbTcpClient:
 
         This is blocking and should be run in a worker thread.
         """
-        manufacturer = self.shell("getprop ro.product.manufacturer").stdout.strip()
-        model = self.shell("getprop ro.product.model").stdout.strip()
-        version = self.shell("getprop ro.build.version.release").stdout.strip()
+        # Combine commands to save RTT
+        # We use a separator that unlikely to be in the output
+        sep = "|||"
+        cmd = f"getprop ro.product.manufacturer; echo '{sep}'; getprop ro.product.model; echo '{sep}'; getprop ro.build.version.release"
+        
+        output = self.shell(cmd).stdout
+        parts = output.split(sep)
+        
+        manufacturer = parts[0].strip() if len(parts) > 0 else "Unknown"
+        model = parts[1].strip() if len(parts) > 1 else "Android Device"
+        version = parts[2].strip() if len(parts) > 2 else "Unknown"
 
         return DeviceInfo(
             manufacturer=manufacturer or "Unknown",
