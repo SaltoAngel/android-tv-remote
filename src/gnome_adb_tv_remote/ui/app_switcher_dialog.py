@@ -154,6 +154,7 @@ class AppSwitcherDialog(Adw.Dialog):
         self._list_box = Gtk.ListBox()
         self._list_box.set_selection_mode(Gtk.SelectionMode.NONE)
         self._list_box.add_css_class("boxed-list")
+        self._list_box.connect("row-activated", self._on_list_row_activated)
         scrolled.set_child(self._list_box)
         self._stack.add_named(scrolled, "apps")
 
@@ -349,13 +350,13 @@ class AppSwitcherDialog(Adw.Dialog):
             box.append(badge)
 
         row.set_child(box)
-        row.connect("activated", lambda *_, idx=index: self._on_row_activated(idx))
 
         self._item_boxes.append(box)
         return row
 
-    def _on_row_activated(self, index: int) -> None:
+    def _on_list_row_activated(self, _list_box: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
         """Handle row click/activation."""
+        index = row.get_index()
         self._selected_index = index
         self._activate_selected()
 
