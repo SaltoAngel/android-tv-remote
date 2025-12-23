@@ -33,12 +33,13 @@ class DeviceInfo:
     version: str
 
 
-@dataclass(frozen=True)
+@dataclass
 class AppInfo:
     """Information about an installed or running app."""
     package_name: str
     label: str  # Human-readable app name
     is_active: bool = False  # Whether this app is currently in foreground
+    icon_path: str | None = None  # Path to cached icon file
 
 
 class AdbTcpClient:
@@ -308,6 +309,58 @@ class AdbTcpClient:
         # Use monkey to launch the main activity
         result = self.shell(f"monkey -p {package_name} -c android.intent.category.LEANBACK_LAUNCHER 1 2>/dev/null || monkey -p {package_name} -c android.intent.category.LAUNCHER 1")
         return "Events injected" in result.stdout or "No activities found" not in result.stdout
+
+    def get_app_icon(self, package_name: str) -> bytes | None:
+        """Extract app icon from APK.
+
+        Args:
+            package_name: The package name of the app.
+
+        Returns:
+            Icon data as PNG bytes, or None if extraction failed.
+        """
+        import base64
+
+        # Get APK path
+        result = self.shell(f"pm path {package_name}")
+        if not result.stdout or "package:" not in result.stdout:
+            return None
+
+        apk_path = result.stdout.split("package:")[1].strip().split('\n')[0]
+
+        # Common icon paths to try (highest resolution first)
+        icon_paths = [
+            "res/mipmap-xxxhdpi-v4/ic_launcher.png",
+            "res/mipmap-xxhdpi-v4/ic_launcher.png",
+            "res/mipmap-xhdpi-v4/ic_launcher.png",
+            "res/mipmap-hdpi-v4/ic_launcher.png",
+            "res/mipmap-mdpi-v4/ic_launcher.png",
+            "res/drawable-xxxhdpi-v4/ic_launcher.png",
+            "res/drawable-xxhdpi-v4/ic_launcher.png",
+            "res/drawable-xhdpi-v4/ic_launcher.png",
+            "res/drawable-hdpi-v4/ic_launcher.png",
+            # Banner icons for TV apps
+            "res/drawable-xhdpi/banner.png",
+            "res/drawable/banner.png",
+            "res/mipmap-xhdpi-v4/ic_launcher_foreground.png",
+            # Round icons
+            "res/mipmap-xxxhdpi-v4/ic_launcher_round.png",
+            "res/mipmap-xxhdpi-v4/ic_launcher_round.png",
+        ]
+
+        for icon_path in icon_paths:
+            # Try to extract icon and encode as base64
+            result = self.shell(f"unzip -p '{apk_path}' '{icon_path}' 2>/dev/null | base64")
+            if result.stdout and len(result.stdout.strip()) > 100:
+                try:
+                    icon_data = base64.b64decode(result.stdout.strip())
+                    # Verify it's valid PNG (starts with PNG magic bytes)
+                    if icon_data[:4] == b'\x89PNG':
+                        return icon_data
+                except Exception:
+                    continue
+
+        return None
 
 
     def is_paired_silent(self) -> bool:

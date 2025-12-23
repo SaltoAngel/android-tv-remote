@@ -16,9 +16,10 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbTcpClient, AppInfo  # noqa: E402
+from ..core.icon_cache import fetch_and_cache_icon, get_cached_icon  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,7 @@ class AppLauncherDialog(Adw.Dialog):
     def _on_apps_loaded(self, apps: list[AppInfo]) -> None:
         """Called when apps are loaded."""
         self._apps = apps
+        self._icon_widgets: dict[str, Gtk.Image] = {}
 
         # Clear existing
         while child := self._flow_box.get_first_child():
@@ -185,12 +187,17 @@ class AppLauncherDialog(Adw.Dialog):
 
         # Add app buttons
         for app in apps:
-            btn = self._create_app_button(app)
+            btn, icon_widget = self._create_app_button(app)
             self._flow_box.append(btn)
+            if icon_widget:
+                self._icon_widgets[app.package_name] = icon_widget
 
         self._stack.set_visible_child_name("apps")
 
-    def _create_app_button(self, app: AppInfo) -> Gtk.Button:
+        # Load icons asynchronously
+        self._load_icons_async()
+
+    def _create_app_button(self, app: AppInfo) -> tuple[Gtk.Button, Gtk.Image | None]:
         """Create a button for an app."""
         btn = Gtk.Button()
         btn.add_css_class("app-button")
@@ -204,10 +211,22 @@ class AppLauncherDialog(Adw.Dialog):
         box.set_valign(Gtk.Align.CENTER)
         box.set_halign(Gtk.Align.CENTER)
 
-        # App icon placeholder (using generic icon)
-        icon = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
-        icon.set_pixel_size(32)
-        box.append(icon)
+        # App icon - check cache first, otherwise use placeholder
+        icon_widget: Gtk.Image | None = None
+        cached_icon = get_cached_icon(app.package_name, self._adb.host)
+        
+        if cached_icon:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(cached_icon, 48, 48, True)
+                icon_widget = Gtk.Image.new_from_pixbuf(pixbuf)
+            except Exception:
+                icon_widget = None
+        
+        if not icon_widget:
+            icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
+            icon_widget.set_pixel_size(48)
+        
+        box.append(icon_widget)
 
         # App label
         label = Gtk.Label(label=app.label)
@@ -230,11 +249,38 @@ class AppLauncherDialog(Adw.Dialog):
         # Connect click handler
         btn.connect("clicked", lambda *_, pkg=app.package_name: self._on_app_clicked(pkg))
 
-        return btn
+        return btn, icon_widget
 
     def _on_app_clicked(self, package_name: str) -> None:
         """Handle app button click."""
         if self._on_launch:
             self._on_launch(package_name)
         self.close()
+
+    def _load_icons_async(self) -> None:
+        """Load app icons asynchronously in background."""
+        def worker():
+            for app in self._apps:
+                # Skip if we already have a cached icon
+                if get_cached_icon(app.package_name, self._adb.host):
+                    continue
+
+                # Fetch and cache icon
+                icon_path = fetch_and_cache_icon(self._adb, app.package_name)
+                if icon_path:
+                    GLib.idle_add(self._update_icon, app.package_name, icon_path)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_icon(self, package_name: str, icon_path: str) -> None:
+        """Update icon widget with loaded icon."""
+        icon_widget = self._icon_widgets.get(package_name)
+        if not icon_widget:
+            return
+
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon_path, 48, 48, True)
+            icon_widget.set_from_pixbuf(pixbuf)
+        except Exception as e:
+            logger.debug(f"Failed to load icon for {package_name}: {e}")
 

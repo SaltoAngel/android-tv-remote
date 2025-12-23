@@ -17,9 +17,10 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbTcpClient, AppInfo  # noqa: E402
+from ..core.icon_cache import fetch_and_cache_icon, get_cached_icon  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -277,6 +278,7 @@ class AppSwitcherDialog(Adw.Dialog):
         """Called when apps are loaded."""
         self._apps = apps
         self._item_boxes = []
+        self._icon_widgets: dict[str, Gtk.Image] = {}
         self._selected_index = 0
 
         # Clear existing
@@ -289,8 +291,10 @@ class AppSwitcherDialog(Adw.Dialog):
 
         # Add app rows
         for i, app in enumerate(apps):
-            row = self._create_app_row(app, i)
+            row, icon_widget = self._create_app_row(app, i)
             self._list_box.append(row)
+            if icon_widget:
+                self._icon_widgets[app.package_name] = icon_widget
 
         # Select first non-active app (for quick switching)
         # If all are active or only one app, select the first
@@ -305,7 +309,10 @@ class AppSwitcherDialog(Adw.Dialog):
 
         self._stack.set_visible_child_name("apps")
 
-    def _create_app_row(self, app: AppInfo, index: int) -> Gtk.ListBoxRow:
+        # Load icons asynchronously
+        self._load_icons_async()
+
+    def _create_app_row(self, app: AppInfo, index: int) -> tuple[Gtk.ListBoxRow, Gtk.Image | None]:
         """Create a row for an app."""
         row = Gtk.ListBoxRow()
         row.set_activatable(True)
@@ -317,10 +324,22 @@ class AppSwitcherDialog(Adw.Dialog):
         if app.is_active:
             box.add_css_class("active-app")
 
-        # Icon
-        icon = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
-        icon.set_pixel_size(32)
-        box.append(icon)
+        # Icon - check cache first
+        icon_widget: Gtk.Image | None = None
+        cached_icon = get_cached_icon(app.package_name, self._adb.host)
+
+        if cached_icon:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(cached_icon, 32, 32, True)
+                icon_widget = Gtk.Image.new_from_pixbuf(pixbuf)
+            except Exception:
+                icon_widget = None
+
+        if not icon_widget:
+            icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
+            icon_widget.set_pixel_size(32)
+
+        box.append(icon_widget)
 
         # Text content
         text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -352,11 +371,38 @@ class AppSwitcherDialog(Adw.Dialog):
         row.set_child(box)
 
         self._item_boxes.append(box)
-        return row
+        return row, icon_widget
 
     def _on_list_row_activated(self, _list_box: Gtk.ListBox, row: Gtk.ListBoxRow) -> None:
         """Handle row click/activation."""
         index = row.get_index()
         self._selected_index = index
         self._activate_selected()
+
+    def _load_icons_async(self) -> None:
+        """Load app icons asynchronously in background."""
+        def worker():
+            for app in self._apps:
+                # Skip if we already have a cached icon
+                if get_cached_icon(app.package_name, self._adb.host):
+                    continue
+
+                # Fetch and cache icon
+                icon_path = fetch_and_cache_icon(self._adb, app.package_name)
+                if icon_path:
+                    GLib.idle_add(self._update_icon, app.package_name, icon_path)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_icon(self, package_name: str, icon_path: str) -> None:
+        """Update icon widget with loaded icon."""
+        icon_widget = self._icon_widgets.get(package_name)
+        if not icon_widget:
+            return
+
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon_path, 32, 32, True)
+            icon_widget.set_from_pixbuf(pixbuf)
+        except Exception as e:
+            logger.debug(f"Failed to load icon for {package_name}: {e}")
 
