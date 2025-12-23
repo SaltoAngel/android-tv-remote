@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 
-from gi.repository import Adw, Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbTcpClient, AppInfo  # noqa: E402
 from ..core.icon_cache import fetch_and_cache_icon, get_cached_icon  # noqa: E402
@@ -325,20 +325,18 @@ class AppSwitcherDialog(Adw.Dialog):
             box.add_css_class("active-app")
 
         # Icon - check cache first
-        icon_widget = Gtk.Image()
-        icon_widget.set_size_request(32, 32)
         cached_icon = get_cached_icon(app.package_name, self._adb.host)
 
         if cached_icon:
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file(cached_icon)
-                pixbuf = pixbuf.scale_simple(32, 32, GdkPixbuf.InterpType.BILINEAR)
-                icon_widget.set_from_pixbuf(pixbuf)
+                icon_widget = Gtk.Picture.new_for_filename(cached_icon)
+                icon_widget.set_size_request(32, 32)
+                icon_widget.set_content_fit(Gtk.ContentFit.CONTAIN)
             except Exception:
-                icon_widget.set_from_icon_name("application-x-executable-symbolic")
+                icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
                 icon_widget.set_pixel_size(32)
         else:
-            icon_widget.set_from_icon_name("application-x-executable-symbolic")
+            icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
             icon_widget.set_pixel_size(32)
 
         box.append(icon_widget)
@@ -403,9 +401,18 @@ class AppSwitcherDialog(Adw.Dialog):
             return
 
         try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file(icon_path)
-            pixbuf = pixbuf.scale_simple(32, 32, GdkPixbuf.InterpType.BILINEAR)
-            icon_widget.set_from_pixbuf(pixbuf)
+            # Replace the Image widget with a Picture widget
+            parent = icon_widget.get_parent()
+            if parent:
+                new_icon = Gtk.Picture.new_for_filename(icon_path)
+                new_icon.set_size_request(32, 32)
+                new_icon.set_content_fit(Gtk.ContentFit.CONTAIN)
+                
+                # Insert at the beginning (before text)
+                parent.remove(icon_widget)
+                parent.prepend(new_icon)
+                
+                self._icon_widgets[package_name] = new_icon
         except Exception as e:
             logger.debug(f"Failed to load icon for {package_name}: {e}")
 
