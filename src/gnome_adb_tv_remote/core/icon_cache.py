@@ -27,19 +27,20 @@ def get_cache_dir() -> Path:
     return cache_dir
 
 
-def get_icon_cache_path(package_name: str, device_ip: str) -> Path:
+def get_icon_cache_path(package_name: str, device_ip: str, ext: str = "png") -> Path:
     """Get the cache file path for an app icon.
     
     Args:
         package_name: The app's package name.
         device_ip: The device IP (to separate icons from different devices).
+        ext: File extension (png or webp).
     
     Returns:
         Path to the cached icon file.
     """
     # Create a hash to avoid filesystem issues with package names
     key = f"{device_ip}:{package_name}"
-    filename = hashlib.md5(key.encode()).hexdigest()[:16] + ".png"
+    filename = hashlib.md5(key.encode()).hexdigest()[:16] + f".{ext}"
     return get_cache_dir() / filename
 
 
@@ -53,9 +54,11 @@ def get_cached_icon(package_name: str, device_ip: str) -> str | None:
     Returns:
         Path to cached icon file, or None if not cached.
     """
-    cache_path = get_icon_cache_path(package_name, device_ip)
-    if cache_path.exists() and cache_path.stat().st_size > 0:
-        return str(cache_path)
+    # Check both PNG and WebP
+    for ext in ["png", "webp"]:
+        cache_path = get_icon_cache_path(package_name, device_ip, ext)
+        if cache_path.exists() and cache_path.stat().st_size > 0:
+            return str(cache_path)
     return None
 
 
@@ -65,13 +68,18 @@ def cache_icon(package_name: str, device_ip: str, icon_data: bytes) -> str | Non
     Args:
         package_name: The app's package name.
         device_ip: The device IP.
-        icon_data: PNG icon data.
+        icon_data: PNG or WebP icon data.
     
     Returns:
         Path to cached icon file, or None if caching failed.
     """
     try:
-        cache_path = get_icon_cache_path(package_name, device_ip)
+        # Determine format from magic bytes
+        ext = "png"
+        if icon_data[:4] == b'RIFF' and len(icon_data) > 12 and icon_data[8:12] == b'WEBP':
+            ext = "webp"
+        
+        cache_path = get_icon_cache_path(package_name, device_ip, ext)
         cache_path.write_bytes(icon_data)
         return str(cache_path)
     except Exception as e:

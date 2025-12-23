@@ -317,19 +317,35 @@ class AdbTcpClient:
             package_name: The package name of the app.
 
         Returns:
-            Icon data as PNG bytes, or None if extraction failed.
+            Icon data as PNG/WebP bytes, or None if extraction failed.
         """
         import base64
 
-        # Get APK path
+        # Get APK path(s) - modern apps may have split APKs
         result = self.shell(f"pm path {package_name}")
         if not result.stdout or "package:" not in result.stdout:
             return None
 
-        apk_path = result.stdout.split("package:")[1].strip().split('\n')[0]
+        # Get all APK paths (base + splits)
+        apk_paths = []
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith("package:"):
+                apk_paths.append(line.split("package:")[1].strip())
 
         # Common icon paths to try (highest resolution first)
+        # Include both PNG and WebP formats
         icon_paths = [
+            # TV banners (preferred for TV apps)
+            "res/mipmap-xhdpi-v4/tv_banner.png",
+            "res/drawable-xhdpi-v4/tv_banner.png",
+            "res/drawable-xhdpi/banner.png",
+            "res/drawable/banner.png",
+            # WebP icons (modern apps)
+            "res/mipmap-xxxhdpi-v4/ic_launcher.webp",
+            "res/mipmap-xxhdpi-v4/ic_launcher.webp",
+            "res/mipmap-xhdpi-v4/ic_launcher.webp",
+            "res/mipmap-hdpi-v4/ic_launcher.webp",
+            # PNG icons
             "res/mipmap-xxxhdpi-v4/ic_launcher.png",
             "res/mipmap-xxhdpi-v4/ic_launcher.png",
             "res/mipmap-xhdpi-v4/ic_launcher.png",
@@ -338,27 +354,33 @@ class AdbTcpClient:
             "res/drawable-xxxhdpi-v4/ic_launcher.png",
             "res/drawable-xxhdpi-v4/ic_launcher.png",
             "res/drawable-xhdpi-v4/ic_launcher.png",
-            "res/drawable-hdpi-v4/ic_launcher.png",
-            # Banner icons for TV apps
-            "res/drawable-xhdpi/banner.png",
-            "res/drawable/banner.png",
-            "res/mipmap-xhdpi-v4/ic_launcher_foreground.png",
-            # Round icons
+            # Round icons (WebP and PNG)
+            "res/mipmap-xxxhdpi-v4/ic_launcher_round.webp",
+            "res/mipmap-xxhdpi-v4/ic_launcher_round.webp",
             "res/mipmap-xxxhdpi-v4/ic_launcher_round.png",
             "res/mipmap-xxhdpi-v4/ic_launcher_round.png",
+            # Foreground icons
+            "res/mipmap-xxxhdpi-v4/ic_launcher_foreground.png",
+            "res/mipmap-xxhdpi-v4/ic_launcher_foreground.png",
         ]
 
-        for icon_path in icon_paths:
-            # Try to extract icon and encode as base64
-            result = self.shell(f"unzip -p '{apk_path}' '{icon_path}' 2>/dev/null | base64")
-            if result.stdout and len(result.stdout.strip()) > 100:
-                try:
-                    icon_data = base64.b64decode(result.stdout.strip())
-                    # Verify it's valid PNG (starts with PNG magic bytes)
-                    if icon_data[:4] == b'\x89PNG':
-                        return icon_data
-                except Exception:
-                    continue
+        # Try each APK (base first, then splits)
+        for apk_path in apk_paths:
+            for icon_path in icon_paths:
+                # Try to extract icon and encode as base64
+                result = self.shell(f"unzip -p '{apk_path}' '{icon_path}' 2>/dev/null | base64")
+                if result.stdout and len(result.stdout.strip()) > 100:
+                    try:
+                        icon_data = base64.b64decode(result.stdout.strip())
+                        # Verify it's valid PNG or WebP
+                        # PNG: starts with \x89PNG
+                        # WebP: starts with RIFF....WEBP
+                        if icon_data[:4] == b'\x89PNG':
+                            return icon_data
+                        if icon_data[:4] == b'RIFF' and icon_data[8:12] == b'WEBP':
+                            return icon_data
+                    except Exception:
+                        continue
 
         return None
 

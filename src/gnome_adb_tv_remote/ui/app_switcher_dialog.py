@@ -325,18 +325,20 @@ class AppSwitcherDialog(Adw.Dialog):
             box.add_css_class("active-app")
 
         # Icon - check cache first
-        icon_widget: Gtk.Image | None = None
+        icon_widget = Gtk.Image()
+        icon_widget.set_size_request(32, 32)
         cached_icon = get_cached_icon(app.package_name, self._adb.host)
 
         if cached_icon:
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(cached_icon, 32, 32, True)
-                icon_widget = Gtk.Image.new_from_pixbuf(pixbuf)
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file(cached_icon)
+                pixbuf = pixbuf.scale_simple(32, 32, GdkPixbuf.InterpType.BILINEAR)
+                icon_widget.set_from_pixbuf(pixbuf)
             except Exception:
-                icon_widget = None
-
-        if not icon_widget:
-            icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
+                icon_widget.set_from_icon_name("application-x-executable-symbolic")
+                icon_widget.set_pixel_size(32)
+        else:
+            icon_widget.set_from_icon_name("application-x-executable-symbolic")
             icon_widget.set_pixel_size(32)
 
         box.append(icon_widget)
@@ -401,7 +403,8 @@ class AppSwitcherDialog(Adw.Dialog):
             return
 
         try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon_path, 32, 32, True)
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file(icon_path)
+            pixbuf = pixbuf.scale_simple(32, 32, GdkPixbuf.InterpType.BILINEAR)
             icon_widget.set_from_pixbuf(pixbuf)
         except Exception as e:
             logger.debug(f"Failed to load icon for {package_name}: {e}")
