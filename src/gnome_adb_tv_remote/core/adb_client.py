@@ -226,22 +226,74 @@ class AdbTcpClient:
 
         Falls back to package name if label cannot be retrieved.
         """
-        # Try to get app label via dumpsys - faster than aapt for single app
-        result = self.shell(f"dumpsys package {package_name} | grep -A1 'labelRes='")
-        import re
-        # Look for label in output
-        match = re.search(r'ApplicationInfo\{.*?(\S+)\}', result.stdout)
+        # Known app mappings for common TV apps
+        KNOWN_APPS = {
+            # Streaming
+            "com.google.android.youtube.tv": "YouTube",
+            "com.google.android.youtube.tvmusic": "YouTube Music",
+            "com.netflix.ninja": "Netflix",
+            "com.amazon.amazonvideo.livingroom": "Prime Video",
+            "com.disney.disneyplus": "Disney+",
+            "com.hbo.hbonow": "HBO Max",
+            "com.apple.atve.androidtv.appletv": "Apple TV",
+            "com.spotify.tv.android": "Spotify",
+            "com.plexapp.android": "Plex",
+            "com.stremio.one": "Stremio",
+            "org.videolan.vlc": "VLC",
+            "com.mxtech.videoplayer.ad": "MX Player",
+            "com.kodi": "Kodi",
+            # Turkish services
+            "com.digiturk.iq.mobil": "beIN CONNECT",
+            "com.turkcell.ott": "Turkcell TV+",
+            "com.blutv.androidtv": "BluTV",
+            "com.exxen.exxen": "Exxen",
+            "com.gain.androidtv": "Gain",
+            "com.tabii.android": "Tabii",
+            # Utilities
+            "org.localsend.localsend_app": "LocalSend",
+            "com.phlox.tvwebbrowser": "TV Bro",
+            "nextapp.fx": "FX Explorer",
+            "com.apkmirror.helper.prod": "APKMirror",
+            "com.bp.box": "BePlayer",
+            # System
+            "com.google.android.apps.tv.launcherx": "Home",
+            "com.android.tv.settings": "Settings",
+            "com.google.android.tvlauncher": "Android TV Home",
+            "com.google.android.katniss": "Google App",
+            "com.google.android.videos": "Google TV",
+        }
 
-        # Fallback: create readable name from package
-        # com.google.android.youtube.tv -> YouTube TV
+        # Check known apps first
+        if package_name in KNOWN_APPS:
+            return KNOWN_APPS[package_name]
+
+        # Try to extract meaningful name from package
         parts = package_name.split('.')
-        if parts:
+        if len(parts) >= 2:
+            # Try different strategies
+            # Strategy 1: Use last meaningful part
             name = parts[-1]
-            # Handle common patterns
+            
+            # Skip generic endings, try second-to-last
+            generic_endings = {'android', 'tv', 'app', 'mobile', 'mobil', 'client', 'prod', 'one'}
+            if name.lower() in generic_endings and len(parts) >= 3:
+                name = parts[-2]
+                # If still generic, combine last two
+                if name.lower() in generic_endings and len(parts) >= 4:
+                    name = f"{parts[-3]} {parts[-2]}"
+            
+            # Clean up the name
             name = name.replace('_', ' ').replace('-', ' ')
-            # Capitalize words
+            
+            # Handle camelCase
+            import re
+            name = re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
+            
+            # Capitalize each word
             name = ' '.join(word.capitalize() for word in name.split())
+            
             return name
+        
         return package_name
 
     def launch_app(self, package_name: str) -> bool:
