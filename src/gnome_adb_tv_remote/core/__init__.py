@@ -1,6 +1,6 @@
 """Core functionality for TV Remote."""
 
-from .adb_client import AdbTcpClient, AdbAuthRequiredError, AdbConnectError, DeviceInfo
+from .adb_client import AdbTcpClient, AdbAuthRequiredError, AdbConnectError, DeviceInfo, AppInfo
 from .scrcpy_controller import (
     ScrcpyServerController,
     ScrcpyError,
@@ -12,6 +12,7 @@ __all__ = [
     "AdbAuthRequiredError",
     "AdbConnectError",
     "DeviceInfo",
+    "AppInfo",
     "ScrcpyServerController",
     "ScrcpyError",
     "ScrcpyConnectionError",

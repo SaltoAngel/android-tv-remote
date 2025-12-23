@@ -33,6 +33,14 @@ class DeviceInfo:
     version: str
 
 
+@dataclass(frozen=True)
+class AppInfo:
+    """Information about an installed or running app."""
+    package_name: str
+    label: str  # Human-readable app name
+    is_active: bool = False  # Whether this app is currently in foreground
+
+
 class AdbTcpClient:
     def __init__(self, host: str, *, port: int = 5555, timeout_s: float = 8.0) -> None:
         self._host = host
@@ -136,6 +144,118 @@ class AdbTcpClient:
             raise AdbConnectError("Not connected")
         out = dev.shell(command)  # adb-shell returns a decoded string by default
         return ShellResult(stdout=str(out) if out is not None else "")
+
+    def get_current_app(self) -> str | None:
+        """Get the currently focused app's package name.
+
+        Returns:
+            Package name of the current foreground app, or None if unavailable.
+        """
+        result = self.shell("dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'")
+        # Parse: mResumedActivity: ActivityRecord{... com.package.name/... ...}
+        import re
+        match = re.search(r'ActivityRecord\{[^ ]+ [^ ]+ ([^/]+)/', result.stdout)
+        if match:
+            return match.group(1)
+        return None
+
+    def get_recent_apps(self, limit: int = 10) -> list[AppInfo]:
+        """Get list of recently used apps.
+
+        Args:
+            limit: Maximum number of apps to return.
+
+        Returns:
+            List of AppInfo for recently used apps, most recent first.
+        """
+        import re
+        result = self.shell("dumpsys activity recents")
+        current_app = self.get_current_app()
+
+        # Parse: * Recent #N: Task{... A=uid:package.name ...} or I=package.name/...
+        pattern = r'\* Recent #\d+:.*?(?:A=\d+:([^\s}]+)|I=([^/\s]+))'
+        matches = re.findall(pattern, result.stdout)
+
+        seen = set()
+        apps: list[AppInfo] = []
+        for match in matches:
+            pkg = match[0] or match[1]
+            if pkg and pkg not in seen:
+                seen.add(pkg)
+                label = self._get_app_label(pkg)
+                apps.append(AppInfo(
+                    package_name=pkg,
+                    label=label,
+                    is_active=(pkg == current_app)
+                ))
+                if len(apps) >= limit:
+                    break
+        return apps
+
+    def get_installed_apps(self, third_party_only: bool = True) -> list[AppInfo]:
+        """Get list of installed apps.
+
+        Args:
+            third_party_only: If True, only return user-installed apps.
+
+        Returns:
+            List of AppInfo for installed apps.
+        """
+        flag = "-3" if third_party_only else ""
+        result = self.shell(f"pm list packages {flag}")
+        current_app = self.get_current_app()
+
+        apps: list[AppInfo] = []
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith("package:"):
+                pkg = line[8:].strip()
+                if pkg:
+                    label = self._get_app_label(pkg)
+                    apps.append(AppInfo(
+                        package_name=pkg,
+                        label=label,
+                        is_active=(pkg == current_app)
+                    ))
+
+        # Sort by label
+        apps.sort(key=lambda a: a.label.lower())
+        return apps
+
+    def _get_app_label(self, package_name: str) -> str:
+        """Get human-readable app label from package name.
+
+        Falls back to package name if label cannot be retrieved.
+        """
+        # Try to get app label via dumpsys - faster than aapt for single app
+        result = self.shell(f"dumpsys package {package_name} | grep -A1 'labelRes='")
+        import re
+        # Look for label in output
+        match = re.search(r'ApplicationInfo\{.*?(\S+)\}', result.stdout)
+
+        # Fallback: create readable name from package
+        # com.google.android.youtube.tv -> YouTube TV
+        parts = package_name.split('.')
+        if parts:
+            name = parts[-1]
+            # Handle common patterns
+            name = name.replace('_', ' ').replace('-', ' ')
+            # Capitalize words
+            name = ' '.join(word.capitalize() for word in name.split())
+            return name
+        return package_name
+
+    def launch_app(self, package_name: str) -> bool:
+        """Launch an app by package name.
+
+        Args:
+            package_name: The package name of the app to launch.
+
+        Returns:
+            True if launch command was sent successfully.
+        """
+        # Use monkey to launch the main activity
+        result = self.shell(f"monkey -p {package_name} -c android.intent.category.LEANBACK_LAUNCHER 1 2>/dev/null || monkey -p {package_name} -c android.intent.category.LAUNCHER 1")
+        return "Events injected" in result.stdout or "No activities found" not in result.stdout
 
 
     def is_paired_silent(self) -> bool:

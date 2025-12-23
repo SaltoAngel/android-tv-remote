@@ -34,6 +34,8 @@ from .preferences_dialog import (  # noqa: E402
 )
 from .remote_panel import RemotePanel  # noqa: E402
 from .info_dialog import InfoDialog  # noqa: E402
+from .app_launcher_dialog import AppLauncherDialog  # noqa: E402
+from .app_switcher_dialog import AppSwitcherDialog  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._device_dialog: DeviceDialog | None = None
         self._preferences_dialog: PreferencesDialog | None = None
         self._info_dialog: InfoDialog | None = None
+        self._app_launcher_dialog: AppLauncherDialog | None = None
+        self._app_switcher_dialog: AppSwitcherDialog | None = None
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erenseymen.android-tv-remote")
@@ -169,6 +173,20 @@ class MainWindow(Adw.ApplicationWindow):
         prefs_btn.connect("clicked", self._on_preferences_clicked)
         header.pack_end(prefs_btn)
 
+        # App Launcher button
+        self._app_launcher_btn = Gtk.Button(icon_name="view-app-grid-symbolic")
+        self._app_launcher_btn.set_tooltip_text("Applications (Ctrl+A)")
+        self._app_launcher_btn.connect("clicked", self._on_app_launcher_clicked)
+        self._app_launcher_btn.set_sensitive(False)
+        header.pack_end(self._app_launcher_btn)
+
+        # App Switcher button
+        self._app_switcher_btn = Gtk.Button(icon_name="view-paged-symbolic")
+        self._app_switcher_btn.set_tooltip_text("Switch App (Ctrl+Tab)")
+        self._app_switcher_btn.connect("clicked", self._on_app_switcher_clicked)
+        self._app_switcher_btn.set_sensitive(False)
+        header.pack_end(self._app_switcher_btn)
+
 
         # Content (remote)
         self._remote_panel = RemotePanel()
@@ -200,6 +218,48 @@ class MainWindow(Adw.ApplicationWindow):
             self._info_dialog = InfoDialog(self)
         self._info_dialog.present()
 
+    def _on_app_launcher_clicked(self, *_args) -> None:
+        """Open the app launcher dialog."""
+        if not self._adb or not self._adb.connected:
+            self._toast("Not connected to a device.")
+            return
+        self._app_launcher_dialog = AppLauncherDialog(
+            self._adb,
+            on_launch=self._on_app_launch
+        )
+        self._app_launcher_dialog.present(self)
+
+    def _on_app_switcher_clicked(self, *_args) -> None:
+        """Open the app switcher dialog."""
+        if not self._adb or not self._adb.connected:
+            self._toast("Not connected to a device.")
+            return
+        self._app_switcher_dialog = AppSwitcherDialog(
+            self._adb,
+            on_switch=self._on_app_launch
+        )
+        self._app_switcher_dialog.present(self)
+
+    def _on_app_launch(self, package_name: str) -> None:
+        """Launch an app on the TV."""
+        if not self._adb:
+            return
+
+        import threading
+
+        def worker():
+            try:
+                success = self._adb.launch_app(package_name)
+                if success:
+                    GLib.idle_add(self._toast, f"Launching {package_name.split('.')[-1]}...")
+                else:
+                    GLib.idle_add(self._toast, "Failed to launch app.")
+            except Exception as e:
+                logger.error(f"Failed to launch app: {e}")
+                GLib.idle_add(self._toast, "Failed to launch app.")
+
+        threading.Thread(target=worker, daemon=True).start()
+
     def _auto_connect_last_ip(self) -> None:
         """Load the last successfully connected IP address from settings and auto-connect."""
         last_ip = self._settings.get_string("last-connected-ip")
@@ -227,6 +287,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._connected_ip = ip if connected else None
         # Only enable buttons when scrcpy is ready
         self._remote_panel.set_sensitive(connected and scrcpy_ready)
+        # App launcher/switcher buttons depend on ADB connection (not scrcpy)
+        self._app_launcher_btn.set_sensitive(connected)
+        self._app_switcher_btn.set_sensitive(connected)
         if not connected:
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
@@ -388,6 +451,20 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
+        # Handle Ctrl+Tab for app switcher (works even without scrcpy)
+        if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval == Gdk.KEY_Tab:
+            if self._adb and self._adb.connected:
+                self._on_app_switcher_clicked()
+                return True
+            return False
+
+        # Handle Ctrl+A for app launcher (works even without scrcpy)
+        if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_a, Gdk.KEY_A):
+            if self._adb and self._adb.connected:
+                self._on_app_launcher_clicked()
+                return True
+            return False
+
         # Ignore keyboard shortcuts if scrcpy is not ready
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:

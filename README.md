@@ -20,7 +20,9 @@ A GTK-based remote control application for Android TV devices, powered by [scrcp
 - **Network Scanning**: Auto-discovers Android TV devices on your local network by scanning for hosts with ADB port (5555) open
 - **ADB Connection**: Pure-Python ADB client with RSA key authentication
 - **Auto-Connect**: Remembers and connects to the last successful device on startup
-- **Remote Control UI**: Full-featured remote with D-pad, Home/Back/Menu, volume controls, power, media buttons, and app launcher
+- **Remote Control UI**: Full-featured remote with D-pad, Home/Back/Menu, volume controls, power, and media buttons
+- **App Launcher**: Browse and launch all installed applications on your TV
+- **App Switcher**: Quickly switch between recent apps with Ctrl+Tab
 - **Keyboard Shortcuts**: Control your TV with keyboard shortcuts (all configurable)
 - **Text Input**: Type text directly to your TV for search and input fields
 - **Low-Latency Input**: Uses scrcpy-server technology for fast input response (~35-70ms)
@@ -48,6 +50,8 @@ All shortcuts are configurable through the Preferences dialog.
 | C | Captions/Subtitles |
 | F | Search (YouTube) |
 | K | Focus Keyboard |
+| Ctrl+Tab | App Switcher (switch between recent apps) |
+| Ctrl+A | App Launcher (view all installed apps) |
 
 ## Installation
 
@@ -93,7 +97,9 @@ android-tv-remote/
 │   │   ├── main_window.py     # Main application window
 │   │   ├── device_dialog.py   # Device discovery dialog
 │   │   ├── remote_panel.py    # Remote control widget
-│   │   └── preferences_dialog.py  # Keyboard shortcuts configuration
+│   │   ├── preferences_dialog.py  # Keyboard shortcuts configuration
+│   │   ├── app_launcher_dialog.py # Installed apps browser
+│   │   └── app_switcher_dialog.py # Recent apps switcher
 │   ├── app.py              # Application entry point
 │   └── __main__.py         # Module entry point
 ├── data/                   # Desktop and schema files
