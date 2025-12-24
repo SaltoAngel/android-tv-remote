@@ -152,13 +152,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._power_button.add_css_class("power-button")
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
         header.pack_start(self._power_button)
-        
-        # Screenshot button in header bar
-        self._screenshot_btn = Gtk.Button(icon_name="camera-photo-symbolic")
-        self._screenshot_btn.set_tooltip_text("Take Screenshot (Ctrl+S)")
-        self._screenshot_btn.connect("clicked", self._on_screenshot_clicked)
-        self._screenshot_btn.set_sensitive(False)  # Disabled until connected
-        header.pack_start(self._screenshot_btn)
 
         # Apply CSS for power button hover effect (red on hover)
         css_provider = Gtk.CssProvider()
@@ -247,57 +240,6 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self._app_switcher_dialog.present(self)
 
-    def _on_screenshot_clicked(self, *_args) -> None:
-        """Take a screenshot of the TV screen."""
-        if not self._adb or not self._adb.connected:
-            self._toast("Not connected to a device.")
-            return
-        
-        self._toast("Taking screenshot...")
-        
-        adb = self._adb
-        
-        def worker():
-            try:
-                screenshot_data = adb.take_screenshot()
-                if screenshot_data:
-                    GLib.idle_add(self._save_screenshot, screenshot_data)
-                else:
-                    GLib.idle_add(self._toast, "Failed to capture screenshot.")
-            except Exception as e:
-                logger.error(f"Screenshot failed: {e}")
-                GLib.idle_add(self._toast, "Failed to capture screenshot.")
-        
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _save_screenshot(self, data: bytes) -> None:
-        """Save screenshot data to user's Pictures folder."""
-        import os
-        from datetime import datetime
-        
-        # Get Pictures directory
-        pictures_dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
-        if not pictures_dir:
-            pictures_dir = os.path.expanduser("~/Pictures")
-        
-        # Create TV Remote subfolder
-        screenshot_dir = os.path.join(pictures_dir, "TV Remote")
-        os.makedirs(screenshot_dir, exist_ok=True)
-        
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"tv_screenshot_{timestamp}.png"
-        filepath = os.path.join(screenshot_dir, filename)
-        
-        try:
-            with open(filepath, "wb") as f:
-                f.write(data)
-            self._toast(f"Screenshot saved to {filename}")
-            logger.info(f"Screenshot saved to {filepath}")
-        except Exception as e:
-            logger.error(f"Failed to save screenshot: {e}")
-            self._toast("Failed to save screenshot.")
-
     def _on_app_launch(self, package_name: str) -> None:
         """Launch an app on the TV."""
         if not self._adb:
@@ -346,7 +288,6 @@ class MainWindow(Adw.ApplicationWindow):
         # App launcher/switcher buttons depend on ADB connection (not scrcpy)
         self._app_launcher_btn.set_sensitive(connected)
         self._app_switcher_btn.set_sensitive(connected)
-        self._screenshot_btn.set_sensitive(connected)
         if not connected:
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
@@ -518,13 +459,6 @@ class MainWindow(Adw.ApplicationWindow):
         if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_a, Gdk.KEY_A):
             if self._adb and self._adb.connected:
                 self._on_app_launcher_clicked()
-                return True
-            return False
-
-        # Handle Ctrl+S for screenshot (works even without scrcpy)
-        if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_s, Gdk.KEY_S):
-            if self._adb and self._adb.connected:
-                self._on_screenshot_clicked()
                 return True
             return False
 

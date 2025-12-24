@@ -494,24 +494,6 @@ df -h /data | tail -1
         except ValueError:
             return 0.0
 
-    def take_screenshot(self) -> bytes | None:
-        """Capture a screenshot from the device.
-
-        Returns:
-            Screenshot as PNG bytes, or None if capture failed.
-        """
-        # Use screencap and encode as base64 to transfer binary data
-        result = self.shell("screencap -p | base64")
-        if result.stdout and len(result.stdout.strip()) > 100:
-            try:
-                screenshot_data = base64.b64decode(result.stdout.strip())
-                # Verify it's a valid PNG
-                if screenshot_data[:4] == b'\x89PNG':
-                    return screenshot_data
-            except Exception:
-                pass
-        return None
-
     def get_app_icon(self, package_name: str) -> bytes | None:
         """Extract app icon from APK.
 
