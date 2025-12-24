@@ -64,7 +64,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._info_dialog: InfoDialog | None = None
         self._app_launcher_dialog: AppLauncherDialog | None = None
         self._app_switcher_dialog: AppSwitcherDialog | None = None
-        self._status_poll_id: int | None = None  # GLib source ID for status polling
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erenseymen.android-tv-remote")
@@ -465,9 +464,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._remote_panel.set_sensitive(True)
         self._remote_panel.set_connection_status(None)  # Hide status on success
         logger.info("scrcpy-server connected - low-latency input enabled (no window)")
-        
-        # Start device status polling
-        self._start_status_polling()
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -492,8 +488,6 @@ class MainWindow(Adw.ApplicationWindow):
         if self._connect_thread:
             self._toast("Still connecting…")
             return
-        # Stop status polling
-        self._stop_status_polling()
         # Disconnect scrcpy first
         if self._scrcpy:
             try:
@@ -509,50 +503,7 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
             self._adb = None
         self._set_connected(False)
-        self._remote_panel.update_device_status(None)
         self._toast("Disconnected from device.")
-
-    def _start_status_polling(self) -> None:
-        """Start polling device status every 10 seconds."""
-        if self._status_poll_id:
-            return  # Already polling
-        
-        # Fetch status immediately
-        self._fetch_device_status()
-        
-        # Schedule periodic updates (every 10 seconds)
-        self._status_poll_id = GLib.timeout_add_seconds(10, self._on_status_poll_tick)
-
-    def _stop_status_polling(self) -> None:
-        """Stop polling device status."""
-        if self._status_poll_id:
-            GLib.source_remove(self._status_poll_id)
-            self._status_poll_id = None
-
-    def _on_status_poll_tick(self) -> bool:
-        """Called every 10 seconds to update device status."""
-        if not self._adb or not self._adb.connected:
-            self._status_poll_id = None
-            return False  # Stop polling
-        
-        self._fetch_device_status()
-        return True  # Continue polling
-
-    def _fetch_device_status(self) -> None:
-        """Fetch device status in background thread."""
-        if not self._adb:
-            return
-        
-        adb = self._adb
-        
-        def worker():
-            try:
-                status = adb.get_device_status()
-                GLib.idle_add(self._remote_panel.update_device_status, status)
-            except Exception as e:
-                logger.debug(f"Failed to fetch device status: {e}")
-        
-        threading.Thread(target=worker, daemon=True).start()
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
@@ -608,6 +559,12 @@ class MainWindow(Adw.ApplicationWindow):
         if keyval in self._search_keys or lower_keyval in self._search_keys:
             self._on_remote_text("s")
             self._remote_panel.focus_keyboard()
+            return True
+
+        # Handle TV Input shortcut (T key)
+        if keyval in (Gdk.KEY_t, Gdk.KEY_T):
+            self._remote_panel.flash_button("KEYCODE_TV_INPUT")
+            self._on_remote_keyevent("KEYCODE_TV_INPUT")
             return True
 
         # Handle keyboard shortcuts

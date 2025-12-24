@@ -22,12 +22,10 @@ A GTK-based remote control application for Android TV devices, powered by [scrcp
 - **Auto-Connect**: Remembers and connects to the last successful device on startup
 - **Remote Control UI**: Full-featured remote with D-pad, Home/Back/Menu, volume controls, power, and media buttons
 - **Extended Media Controls**: Rewind, Fast Forward, Skip Previous/Next, and Subtitles
-- **Advanced TV Controls**: TV Input switch, Channel Up/Down, Guide, Info, and colored keys (Red/Green/Yellow/Blue)
-- **Number Pad**: On-screen numpad for direct channel entry
+- **TV Input Switch**: Quick access to switch input sources (T key)
 - **App Launcher**: Browse and launch all installed applications on your TV
 - **App Switcher**: Quickly switch between recent apps with Ctrl+Tab
 - **Screenshot Capture**: Take screenshots from your TV (Ctrl+S)
-- **Device Status**: Real-time display of screen state, volume level, and memory usage
 - **Keyboard Shortcuts**: Control your TV with keyboard shortcuts (all configurable)
 - **Text Input**: Type text directly to your TV for search and input fields
 - **Low-Latency Input**: Uses scrcpy-server technology for fast input response (~35-70ms)
@@ -53,6 +51,7 @@ All shortcuts are configurable through the Preferences dialog.
 | - or , | Volume Down |
 | Delete | Power |
 | C | Captions/Subtitles |
+| T | TV Input (switch source) |
 | F | Search (YouTube) |
 | K | Focus Keyboard |
 | Ctrl+Tab | App Switcher (switch between recent apps) |

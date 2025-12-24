@@ -17,7 +17,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 import os
 
-from ..core.adb_client import DeviceInfo, DeviceStatus  # noqa: E402
+from ..core.adb_client import DeviceInfo  # noqa: E402
 
 # Path to material icons
 def get_icons_dir():
@@ -74,11 +74,6 @@ KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_ASSIST": "assistant",
     "KEYCODE_CAPTIONS": "captions",
     "KEYCODE_TV_INPUT": "tv-input",
-    "KEYCODE_CHANNEL_UP": "channel-up",
-    "KEYCODE_CHANNEL_DOWN": "channel-down",
-    "KEYCODE_GUIDE": "guide",
-    "KEYCODE_INFO": "info",
-    "KEYCODE_SETTINGS": "settings",
 }
 
 
@@ -165,10 +160,13 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 1, 6, icon_name="media-view-subtitles-symbolic")
         self._add_key_button("Next", "KEYCODE_MEDIA_NEXT", 2, 6, icon_name="media-skip-forward-symbolic")
         
-        # System - Row 7: Apps, Assistant, Search
+        # System - Row 7: Apps, Search, Assistant
         self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 7, icon_name="view-app-grid-symbolic")
         self._add_search_button(1, 7, icon_name="system-search-symbolic")
         self._add_key_button("Assistant", "KEYCODE_ASSIST", 2, 7, icon_name="audio-input-microphone-symbolic")
+        
+        # Row 8: Input (centered)
+        self._add_key_button("Input", "KEYCODE_TV_INPUT", 1, 8, icon_name="video-display-symbolic")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -183,16 +181,6 @@ class RemotePanel(Gtk.Box):
         self._keyboard_entry.add_controller(focus_controller)
         
         self.append(self._keyboard_entry)
-        
-        # Device Status Bar
-        self._device_status_bar = self._build_status_bar()
-        self.append(self._device_status_bar)
-        
-        # Advanced Controls - Expandable section
-        self._advanced_expander = Gtk.Expander(label="Advanced Controls")
-        self._advanced_expander.set_margin_top(12)
-        self._build_advanced_controls()
-        self.append(self._advanced_expander)
 
     def set_handlers(self, *, on_keyevent=None, on_text=None) -> None:
         self._on_keyevent = on_keyevent
@@ -300,89 +288,6 @@ class RemotePanel(Gtk.Box):
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
 
-    def _build_status_bar(self) -> Gtk.Box:
-        """Build the device status bar showing volume, power, etc."""
-        status_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
-        status_bar.set_halign(Gtk.Align.CENTER)
-        status_bar.set_margin_top(12)
-        status_bar.set_margin_bottom(4)
-        status_bar.add_css_class("dim-label")
-        status_bar.set_visible(False)  # Hidden until connected
-        
-        # Screen status indicator
-        self._screen_status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        self._screen_status_icon = Gtk.Image.new_from_icon_name("display-brightness-symbolic")
-        self._screen_status_icon.set_pixel_size(16)
-        self._screen_status_label = Gtk.Label(label="Screen: --")
-        self._screen_status_box.append(self._screen_status_icon)
-        self._screen_status_box.append(self._screen_status_label)
-        status_bar.append(self._screen_status_box)
-        
-        # Separator
-        sep1 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        status_bar.append(sep1)
-        
-        # Volume indicator
-        self._volume_status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        self._volume_status_icon = Gtk.Image.new_from_icon_name("audio-volume-medium-symbolic")
-        self._volume_status_icon.set_pixel_size(16)
-        self._volume_status_label = Gtk.Label(label="Vol: --")
-        self._volume_status_box.append(self._volume_status_icon)
-        self._volume_status_box.append(self._volume_status_label)
-        status_bar.append(self._volume_status_box)
-        
-        # Separator
-        sep2 = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        status_bar.append(sep2)
-        
-        # Memory indicator
-        self._memory_status_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        self._memory_status_icon = Gtk.Image.new_from_icon_name("drive-harddisk-symbolic")
-        self._memory_status_icon.set_pixel_size(16)
-        self._memory_status_label = Gtk.Label(label="Mem: --")
-        self._memory_status_box.append(self._memory_status_icon)
-        self._memory_status_box.append(self._memory_status_label)
-        status_bar.append(self._memory_status_box)
-        
-        return status_bar
-
-    def update_device_status(self, status: DeviceStatus | None) -> None:
-        """Update the device status bar with current status info."""
-        if status is None:
-            self._device_status_bar.set_visible(False)
-            return
-        
-        self._device_status_bar.set_visible(True)
-        
-        # Update screen status
-        if status.screen_on:
-            self._screen_status_label.set_text("Screen: On")
-            self._screen_status_icon.set_from_icon_name("display-brightness-symbolic")
-        else:
-            self._screen_status_label.set_text("Screen: Off")
-            self._screen_status_icon.set_from_icon_name("display-brightness-symbolic")
-        
-        # Update volume status
-        if status.volume_max > 0:
-            vol_percent = int((status.volume_level / status.volume_max) * 100)
-            self._volume_status_label.set_text(f"Vol: {status.volume_level}/{status.volume_max}")
-            
-            # Update icon based on volume level
-            if status.volume_level == 0:
-                self._volume_status_icon.set_from_icon_name("audio-volume-muted-symbolic")
-            elif vol_percent < 33:
-                self._volume_status_icon.set_from_icon_name("audio-volume-low-symbolic")
-            elif vol_percent < 66:
-                self._volume_status_icon.set_from_icon_name("audio-volume-medium-symbolic")
-            else:
-                self._volume_status_icon.set_from_icon_name("audio-volume-high-symbolic")
-        
-        # Update memory status
-        if status.memory_total_mb > 0:
-            mem_used_gb = status.memory_used_mb / 1024
-            mem_total_gb = status.memory_total_mb / 1024
-            self._memory_status_label.set_text(f"Mem: {mem_used_gb:.1f}/{mem_total_gb:.1f}GB")
-
     def _on_keyboard_focus_enter(self, *_args) -> None:
         """Called when keyboard input area gains focus."""
         self._keyboard_focused = True
@@ -471,137 +376,6 @@ class RemotePanel(Gtk.Box):
             return False  # Don't repeat
 
         GLib.timeout_add(150, remove_flash)
-
-    def _build_advanced_controls(self) -> None:
-        """Build the advanced controls section with TV-specific buttons."""
-        advanced_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        advanced_box.set_margin_top(8)
-        
-        # TV Controls Grid
-        tv_grid = Gtk.Grid(column_spacing=8, row_spacing=8)
-        tv_grid.set_column_homogeneous(True)
-        
-        # Row 0: TV Input, Guide, Info, Settings
-        self._add_advanced_button(tv_grid, "Input", "KEYCODE_TV_INPUT", 0, 0, icon_name="video-display-symbolic")
-        self._add_advanced_button(tv_grid, "Guide", "KEYCODE_GUIDE", 1, 0, icon_name="x-office-calendar-symbolic")
-        self._add_advanced_button(tv_grid, "Info", "KEYCODE_INFO", 2, 0, icon_name="dialog-information-symbolic")
-        self._add_advanced_button(tv_grid, "Settings", "KEYCODE_SETTINGS", 3, 0, icon_name="emblem-system-symbolic")
-        
-        # Row 1: Channel controls
-        self._add_advanced_button(tv_grid, "CH-", "KEYCODE_CHANNEL_DOWN", 0, 1, icon_name="go-down-symbolic")
-        self._add_advanced_button(tv_grid, "CH+", "KEYCODE_CHANNEL_UP", 3, 1, icon_name="go-up-symbolic")
-        
-        advanced_box.append(tv_grid)
-        
-        # Numpad section
-        numpad_label = Gtk.Label(label="Number Pad (Channel Input)")
-        numpad_label.add_css_class("dim-label")
-        numpad_label.set_margin_top(12)
-        numpad_label.set_halign(Gtk.Align.START)
-        advanced_box.append(numpad_label)
-        
-        numpad_grid = Gtk.Grid(column_spacing=8, row_spacing=8)
-        numpad_grid.set_column_homogeneous(True)
-        
-        # Standard numpad layout: 
-        # 1 2 3
-        # 4 5 6
-        # 7 8 9
-        #   0
-        self._add_numpad_button(numpad_grid, "1", "KEYCODE_1", 0, 0)
-        self._add_numpad_button(numpad_grid, "2", "KEYCODE_2", 1, 0)
-        self._add_numpad_button(numpad_grid, "3", "KEYCODE_3", 2, 0)
-        self._add_numpad_button(numpad_grid, "4", "KEYCODE_4", 0, 1)
-        self._add_numpad_button(numpad_grid, "5", "KEYCODE_5", 1, 1)
-        self._add_numpad_button(numpad_grid, "6", "KEYCODE_6", 2, 1)
-        self._add_numpad_button(numpad_grid, "7", "KEYCODE_7", 0, 2)
-        self._add_numpad_button(numpad_grid, "8", "KEYCODE_8", 1, 2)
-        self._add_numpad_button(numpad_grid, "9", "KEYCODE_9", 2, 2)
-        self._add_numpad_button(numpad_grid, "0", "KEYCODE_0", 1, 3)
-        
-        advanced_box.append(numpad_grid)
-        
-        # Colored buttons section
-        color_label = Gtk.Label(label="Color Keys (Teletext/HbbTV)")
-        color_label.add_css_class("dim-label")
-        color_label.set_margin_top(12)
-        color_label.set_halign(Gtk.Align.START)
-        advanced_box.append(color_label)
-        
-        color_grid = Gtk.Grid(column_spacing=8, row_spacing=8)
-        color_grid.set_column_homogeneous(True)
-        
-        # Colored buttons with actual colors
-        self._add_color_button(color_grid, "Red", "KEYCODE_PROG_RED", 0, 0, "#e74c3c")
-        self._add_color_button(color_grid, "Green", "KEYCODE_PROG_GREEN", 1, 0, "#2ecc71")
-        self._add_color_button(color_grid, "Yellow", "KEYCODE_PROG_YELLOW", 2, 0, "#f1c40f")
-        self._add_color_button(color_grid, "Blue", "KEYCODE_PROG_BLUE", 3, 0, "#3498db")
-        
-        advanced_box.append(color_grid)
-        
-        self._advanced_expander.set_child(advanced_box)
-
-    def _add_advanced_button(self, grid: Gtk.Grid, label: str, keycode: str, col: int, row: int, icon_name: str | None = None) -> None:
-        """Add a button to the advanced controls grid."""
-        btn = Gtk.Button()
-        btn.set_tooltip_text(label)
-        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
-        btn.set_hexpand(True)
-        
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        box.set_halign(Gtk.Align.CENTER)
-        
-        if icon_name:
-            image = Gtk.Image.new_from_icon_name(icon_name)
-            image.set_pixel_size(16)
-            box.append(image)
-        
-        text_label = Gtk.Label(label=label)
-        box.append(text_label)
-        
-        btn.set_child(box)
-        grid.attach(btn, col, row, 1, 1)
-        
-        self._keycode_buttons[keycode] = btn
-
-    def _add_numpad_button(self, grid: Gtk.Grid, label: str, keycode: str, col: int, row: int) -> None:
-        """Add a numpad button for channel input."""
-        btn = Gtk.Button(label=label)
-        btn.set_tooltip_text(f"Number {label}")
-        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
-        btn.set_hexpand(True)
-        
-        # Make numpad buttons slightly larger and more prominent
-        btn.add_css_class("flat")
-        
-        grid.attach(btn, col, row, 1, 1)
-        
-        self._keycode_buttons[keycode] = btn
-
-    def _add_color_button(self, grid: Gtk.Grid, label: str, keycode: str, col: int, row: int, color: str) -> None:
-        """Add a colored button for teletext/HbbTV."""
-        btn = Gtk.Button(label=label)
-        btn.set_tooltip_text(f"{label} Button")
-        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
-        btn.set_hexpand(True)
-        
-        # Apply custom CSS for this button's color
-        css_provider = Gtk.CssProvider()
-        css_provider.load_from_string(f"""
-            button {{
-                background-color: {color};
-                color: white;
-                font-weight: bold;
-            }}
-            button:hover {{
-                background-color: shade({color}, 1.1);
-            }}
-        """)
-        btn.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        
-        grid.attach(btn, col, row, 1, 1)
-        
-        self._keycode_buttons[keycode] = btn
 
     def _add_key_button(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
         # Create button
