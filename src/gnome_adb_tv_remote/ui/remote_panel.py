@@ -78,6 +78,7 @@ KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_CHANNEL_DOWN": "channel-down",
     "KEYCODE_GUIDE": "guide",
     "KEYCODE_INFO": "info",
+    "KEYCODE_SETTINGS": "settings",
 }
 
 
@@ -480,14 +481,15 @@ class RemotePanel(Gtk.Box):
         tv_grid = Gtk.Grid(column_spacing=8, row_spacing=8)
         tv_grid.set_column_homogeneous(True)
         
-        # Row 0: TV Input, Guide, Info
+        # Row 0: TV Input, Guide, Info, Settings
         self._add_advanced_button(tv_grid, "Input", "KEYCODE_TV_INPUT", 0, 0, icon_name="video-display-symbolic")
         self._add_advanced_button(tv_grid, "Guide", "KEYCODE_GUIDE", 1, 0, icon_name="x-office-calendar-symbolic")
         self._add_advanced_button(tv_grid, "Info", "KEYCODE_INFO", 2, 0, icon_name="dialog-information-symbolic")
+        self._add_advanced_button(tv_grid, "Settings", "KEYCODE_SETTINGS", 3, 0, icon_name="emblem-system-symbolic")
         
         # Row 1: Channel controls
         self._add_advanced_button(tv_grid, "CH-", "KEYCODE_CHANNEL_DOWN", 0, 1, icon_name="go-down-symbolic")
-        self._add_advanced_button(tv_grid, "CH+", "KEYCODE_CHANNEL_UP", 2, 1, icon_name="go-up-symbolic")
+        self._add_advanced_button(tv_grid, "CH+", "KEYCODE_CHANNEL_UP", 3, 1, icon_name="go-up-symbolic")
         
         advanced_box.append(tv_grid)
         
