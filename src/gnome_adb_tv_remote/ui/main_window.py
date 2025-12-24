@@ -245,8 +245,6 @@ class MainWindow(Adw.ApplicationWindow):
         if not self._adb:
             return
 
-        import threading
-
         def worker():
             try:
                 success = self._adb.launch_app(package_name)

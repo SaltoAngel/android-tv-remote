@@ -6,6 +6,13 @@ from .scrcpy_controller import (
     ScrcpyError,
     ScrcpyConnectionError,
 )
+from .icon_cache import (
+    get_cache_dir,
+    get_icon_cache_path,
+    get_cached_icon,
+    cache_icon,
+    fetch_and_cache_icon,
+)
 
 __all__ = [
     "AdbTcpClient",
@@ -16,4 +23,9 @@ __all__ = [
     "ScrcpyServerController",
     "ScrcpyError",
     "ScrcpyConnectionError",
+    "get_cache_dir",
+    "get_icon_cache_path",
+    "get_cached_icon",
+    "cache_icon",
+    "fetch_and_cache_icon",
 ]

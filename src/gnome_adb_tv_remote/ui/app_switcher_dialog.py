@@ -20,7 +20,7 @@ gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbTcpClient, AppInfo  # noqa: E402
-from ..core.icon_cache import fetch_and_cache_icon, get_cached_icon  # noqa: E402
+from .icon_loader import create_app_icon, load_icons_in_background, update_icon_widget  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +291,7 @@ class AppSwitcherDialog(Adw.Dialog):
 
         # Add app rows
         for i, app in enumerate(apps):
-            row, icon_widget = self._create_app_row(app, i)
+            row, icon_widget = self._create_app_row(app)
             self._list_box.append(row)
             if icon_widget:
                 self._icon_widgets[app.package_name] = icon_widget
@@ -312,7 +312,7 @@ class AppSwitcherDialog(Adw.Dialog):
         # Load icons asynchronously
         self._load_icons_async()
 
-    def _create_app_row(self, app: AppInfo, index: int) -> tuple[Gtk.ListBoxRow, Gtk.Image | None]:
+    def _create_app_row(self, app: AppInfo) -> tuple[Gtk.ListBoxRow, Gtk.Image | None]:
         """Create a row for an app."""
         row = Gtk.ListBoxRow()
         row.set_activatable(True)
@@ -325,19 +325,7 @@ class AppSwitcherDialog(Adw.Dialog):
             box.add_css_class("active-app")
 
         # Icon - check cache first
-        cached_icon = get_cached_icon(app.package_name, self._adb.host)
-
-        if cached_icon:
-            try:
-                icon_widget = Gtk.Picture.new_for_filename(cached_icon)
-                icon_widget.set_size_request(32, 32)
-                icon_widget.set_content_fit(Gtk.ContentFit.CONTAIN)
-            except Exception:
-                icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
-                icon_widget.set_pixel_size(32)
-        else:
-            icon_widget = Gtk.Image.new_from_icon_name("application-x-executable-symbolic")
-            icon_widget.set_pixel_size(32)
+        icon_widget = create_app_icon(app.package_name, self._adb.host, size=32)
 
         box.append(icon_widget)
 
@@ -381,38 +369,9 @@ class AppSwitcherDialog(Adw.Dialog):
 
     def _load_icons_async(self) -> None:
         """Load app icons asynchronously in background."""
-        def worker():
-            for app in self._apps:
-                # Skip if we already have a cached icon
-                if get_cached_icon(app.package_name, self._adb.host):
-                    continue
-
-                # Fetch and cache icon
-                icon_path = fetch_and_cache_icon(self._adb, app.package_name)
-                if icon_path:
-                    GLib.idle_add(self._update_icon, app.package_name, icon_path)
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _update_icon(self, package_name: str, icon_path: str) -> None:
-        """Update icon widget with loaded icon."""
-        icon_widget = self._icon_widgets.get(package_name)
-        if not icon_widget:
-            return
-
-        try:
-            # Replace the Image widget with a Picture widget
-            parent = icon_widget.get_parent()
-            if parent:
-                new_icon = Gtk.Picture.new_for_filename(icon_path)
-                new_icon.set_size_request(32, 32)
-                new_icon.set_content_fit(Gtk.ContentFit.CONTAIN)
-                
-                # Insert at the beginning (before text)
-                parent.remove(icon_widget)
-                parent.prepend(new_icon)
-                
-                self._icon_widgets[package_name] = new_icon
-        except Exception as e:
-            logger.debug(f"Failed to load icon for {package_name}: {e}")
+        load_icons_in_background(
+            self._apps,
+            self._adb,
+            lambda pkg, path: update_icon_widget(self._icon_widgets, pkg, path, size=32)
+        )
 

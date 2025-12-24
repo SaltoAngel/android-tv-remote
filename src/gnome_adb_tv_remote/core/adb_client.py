@@ -8,6 +8,8 @@ shell commands.
 
 from __future__ import annotations
 
+import base64
+import re
 from dataclasses import dataclass
 
 from .keystore import ensure_adb_keys_exist
@@ -154,7 +156,6 @@ class AdbTcpClient:
         """
         result = self.shell("dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity'")
         # Parse: mResumedActivity: ActivityRecord{... com.package.name/... ...}
-        import re
         match = re.search(r'ActivityRecord\{[^ ]+ [^ ]+ ([^/]+)/', result.stdout)
         if match:
             return match.group(1)
@@ -169,7 +170,6 @@ class AdbTcpClient:
         Returns:
             List of AppInfo for recently used apps, most recent first.
         """
-        import re
         result = self.shell("dumpsys activity recents")
         current_app = self.get_current_app()
 
@@ -287,7 +287,6 @@ class AdbTcpClient:
             name = name.replace('_', ' ').replace('-', ' ')
             
             # Handle camelCase
-            import re
             name = re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
             
             # Capitalize each word
@@ -319,7 +318,6 @@ class AdbTcpClient:
         Returns:
             Icon data as PNG/WebP bytes, or None if extraction failed.
         """
-        import base64
 
         # Get APK path(s) - modern apps may have split APKs
         result = self.shell(f"pm path {package_name}")
