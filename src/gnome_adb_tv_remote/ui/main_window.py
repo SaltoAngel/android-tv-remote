@@ -19,7 +19,7 @@ gi.require_version("Gdk", "4.0")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient  # noqa: E402
+from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
 from ..core.scrcpy_controller import (  # noqa: E402
     ScrcpyServerController,
     ScrcpyConnectionError,
@@ -64,6 +64,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._info_dialog: InfoDialog | None = None
         self._app_launcher_dialog: AppLauncherDialog | None = None
         self._app_switcher_dialog: AppSwitcherDialog | None = None
+        self._status_poll_id: int | None = None  # GLib source ID for status polling
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erenseymen.android-tv-remote")
@@ -152,6 +153,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._power_button.add_css_class("power-button")
         self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
         header.pack_start(self._power_button)
+        
+        # Screenshot button in header bar
+        self._screenshot_btn = Gtk.Button(icon_name="camera-photo-symbolic")
+        self._screenshot_btn.set_tooltip_text("Take Screenshot (Ctrl+S)")
+        self._screenshot_btn.connect("clicked", self._on_screenshot_clicked)
+        self._screenshot_btn.set_sensitive(False)  # Disabled until connected
+        header.pack_start(self._screenshot_btn)
 
         # Apply CSS for power button hover effect (red on hover)
         css_provider = Gtk.CssProvider()
@@ -240,6 +248,57 @@ class MainWindow(Adw.ApplicationWindow):
         )
         self._app_switcher_dialog.present(self)
 
+    def _on_screenshot_clicked(self, *_args) -> None:
+        """Take a screenshot of the TV screen."""
+        if not self._adb or not self._adb.connected:
+            self._toast("Not connected to a device.")
+            return
+        
+        self._toast("Taking screenshot...")
+        
+        adb = self._adb
+        
+        def worker():
+            try:
+                screenshot_data = adb.take_screenshot()
+                if screenshot_data:
+                    GLib.idle_add(self._save_screenshot, screenshot_data)
+                else:
+                    GLib.idle_add(self._toast, "Failed to capture screenshot.")
+            except Exception as e:
+                logger.error(f"Screenshot failed: {e}")
+                GLib.idle_add(self._toast, "Failed to capture screenshot.")
+        
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _save_screenshot(self, data: bytes) -> None:
+        """Save screenshot data to user's Pictures folder."""
+        import os
+        from datetime import datetime
+        
+        # Get Pictures directory
+        pictures_dir = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_PICTURES)
+        if not pictures_dir:
+            pictures_dir = os.path.expanduser("~/Pictures")
+        
+        # Create TV Remote subfolder
+        screenshot_dir = os.path.join(pictures_dir, "TV Remote")
+        os.makedirs(screenshot_dir, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"tv_screenshot_{timestamp}.png"
+        filepath = os.path.join(screenshot_dir, filename)
+        
+        try:
+            with open(filepath, "wb") as f:
+                f.write(data)
+            self._toast(f"Screenshot saved to {filename}")
+            logger.info(f"Screenshot saved to {filepath}")
+        except Exception as e:
+            logger.error(f"Failed to save screenshot: {e}")
+            self._toast("Failed to save screenshot.")
+
     def _on_app_launch(self, package_name: str) -> None:
         """Launch an app on the TV."""
         if not self._adb:
@@ -288,6 +347,7 @@ class MainWindow(Adw.ApplicationWindow):
         # App launcher/switcher buttons depend on ADB connection (not scrcpy)
         self._app_launcher_btn.set_sensitive(connected)
         self._app_switcher_btn.set_sensitive(connected)
+        self._screenshot_btn.set_sensitive(connected)
         if not connected:
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
@@ -353,7 +413,6 @@ class MainWindow(Adw.ApplicationWindow):
                     GLib.idle_add(self._on_connect_failed_ui, str(e) or "Connection failed")
                     return
 
-                from ..core.adb_client import DeviceInfo
                 GLib.idle_add(self._on_connect_success_ui, ip, client, device_info)
             finally:
                 GLib.idle_add(self._on_connect_done_ui)
@@ -406,6 +465,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._remote_panel.set_sensitive(True)
         self._remote_panel.set_connection_status(None)  # Hide status on success
         logger.info("scrcpy-server connected - low-latency input enabled (no window)")
+        
+        # Start device status polling
+        self._start_status_polling()
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -430,6 +492,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._connect_thread:
             self._toast("Still connecting…")
             return
+        # Stop status polling
+        self._stop_status_polling()
         # Disconnect scrcpy first
         if self._scrcpy:
             try:
@@ -445,7 +509,50 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
             self._adb = None
         self._set_connected(False)
+        self._remote_panel.update_device_status(None)
         self._toast("Disconnected from device.")
+
+    def _start_status_polling(self) -> None:
+        """Start polling device status every 10 seconds."""
+        if self._status_poll_id:
+            return  # Already polling
+        
+        # Fetch status immediately
+        self._fetch_device_status()
+        
+        # Schedule periodic updates (every 10 seconds)
+        self._status_poll_id = GLib.timeout_add_seconds(10, self._on_status_poll_tick)
+
+    def _stop_status_polling(self) -> None:
+        """Stop polling device status."""
+        if self._status_poll_id:
+            GLib.source_remove(self._status_poll_id)
+            self._status_poll_id = None
+
+    def _on_status_poll_tick(self) -> bool:
+        """Called every 10 seconds to update device status."""
+        if not self._adb or not self._adb.connected:
+            self._status_poll_id = None
+            return False  # Stop polling
+        
+        self._fetch_device_status()
+        return True  # Continue polling
+
+    def _fetch_device_status(self) -> None:
+        """Fetch device status in background thread."""
+        if not self._adb:
+            return
+        
+        adb = self._adb
+        
+        def worker():
+            try:
+                status = adb.get_device_status()
+                GLib.idle_add(self._remote_panel.update_device_status, status)
+            except Exception as e:
+                logger.debug(f"Failed to fetch device status: {e}")
+        
+        threading.Thread(target=worker, daemon=True).start()
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
@@ -460,6 +567,13 @@ class MainWindow(Adw.ApplicationWindow):
         if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_a, Gdk.KEY_A):
             if self._adb and self._adb.connected:
                 self._on_app_launcher_clicked()
+                return True
+            return False
+
+        # Handle Ctrl+S for screenshot (works even without scrcpy)
+        if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_s, Gdk.KEY_S):
+            if self._adb and self._adb.connected:
+                self._on_screenshot_clicked()
                 return True
             return False
 

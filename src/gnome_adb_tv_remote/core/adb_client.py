@@ -44,6 +44,20 @@ class AppInfo:
     icon_path: str | None = None  # Path to cached icon file
 
 
+@dataclass(frozen=True)
+class DeviceStatus:
+    """Current status of the connected device."""
+    screen_on: bool
+    volume_level: int  # 0-100 percentage
+    volume_max: int  # Maximum volume level
+    battery_level: int | None  # 0-100 percentage, None if not available (TV)
+    battery_charging: bool | None  # None if not available
+    memory_used_mb: int
+    memory_total_mb: int
+    storage_used_gb: float
+    storage_total_gb: float
+
+
 class AdbTcpClient:
     def __init__(self, host: str, *, port: int = 5555, timeout_s: float = 8.0) -> None:
         self._host = host
@@ -308,6 +322,195 @@ class AdbTcpClient:
         # Use monkey to launch the main activity
         result = self.shell(f"monkey -p {package_name} -c android.intent.category.LEANBACK_LAUNCHER 1 2>/dev/null || monkey -p {package_name} -c android.intent.category.LAUNCHER 1")
         return "Events injected" in result.stdout or "No activities found" not in result.stdout
+
+    def get_power_state(self) -> bool:
+        """Check if the device screen is on.
+
+        Returns:
+            True if screen is on, False otherwise.
+        """
+        result = self.shell("dumpsys power | grep 'Display Power'")
+        # Look for "Display Power: state=ON" or similar
+        return "state=ON" in result.stdout.upper()
+
+    def get_volume_level(self) -> tuple[int, int]:
+        """Get the current volume level for media stream.
+
+        Returns:
+            Tuple of (current_volume, max_volume).
+        """
+        result = self.shell("dumpsys audio | grep -A 10 'STREAM_MUSIC'")
+        
+        # Parse output like:
+        # - STREAM_MUSIC:
+        #    Muted: false
+        #    Min: 0
+        #    Max: 15
+        #    ...
+        #    Current: 2 (speaker): 8, ...
+        current = 0
+        max_vol = 15  # Default for most Android TVs
+        
+        for line in result.stdout.split('\n'):
+            line = line.strip()
+            if line.startswith("Max:"):
+                try:
+                    max_vol = int(line.split(":")[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif "Current:" in line and "(speaker)" in line:
+                # Parse "Current: 2 (speaker): 8, ..."
+                try:
+                    # Find the value after "(speaker):"
+                    parts = line.split("(speaker):")
+                    if len(parts) > 1:
+                        current = int(parts[1].split(",")[0].strip())
+                except (ValueError, IndexError):
+                    pass
+        
+        return (current, max_vol)
+
+    def get_device_status(self) -> DeviceStatus:
+        """Get comprehensive device status in a single call.
+
+        This combines multiple shell commands for efficiency.
+        """
+        # Combine commands to reduce RTT
+        sep = "|||STATUS_SEP|||"
+        cmd = f"""
+dumpsys power | grep 'Display Power'; echo '{sep}'
+dumpsys audio | grep -A 10 'STREAM_MUSIC'; echo '{sep}'
+dumpsys battery; echo '{sep}'
+cat /proc/meminfo | head -3; echo '{sep}'
+df -h /data | tail -1
+"""
+        result = self.shell(cmd)
+        parts = result.stdout.split(sep)
+        
+        # Parse power state
+        screen_on = "state=ON" in (parts[0] if len(parts) > 0 else "").upper()
+        
+        # Parse volume
+        current_vol, max_vol = 0, 15
+        if len(parts) > 1:
+            audio_output = parts[1]
+            for line in audio_output.split('\n'):
+                line = line.strip()
+                if line.startswith("Max:"):
+                    try:
+                        max_vol = int(line.split(":")[1].strip())
+                    except (ValueError, IndexError):
+                        pass
+                elif "Current:" in line and "(speaker)" in line:
+                    try:
+                        vol_parts = line.split("(speaker):")
+                        if len(vol_parts) > 1:
+                            current_vol = int(vol_parts[1].split(",")[0].strip())
+                    except (ValueError, IndexError):
+                        pass
+        
+        # Parse battery (may not be available on TVs)
+        battery_level = None
+        battery_charging = None
+        if len(parts) > 2:
+            battery_output = parts[2]
+            for line in battery_output.split('\n'):
+                line = line.strip()
+                if line.startswith("level:"):
+                    try:
+                        battery_level = int(line.split(":")[1].strip())
+                    except (ValueError, IndexError):
+                        pass
+                elif line.startswith("status:"):
+                    # 2 = charging, 5 = full
+                    try:
+                        status = int(line.split(":")[1].strip())
+                        battery_charging = status in (2, 5)
+                    except (ValueError, IndexError):
+                        pass
+        
+        # Parse memory
+        mem_total_mb, mem_used_mb = 0, 0
+        if len(parts) > 3:
+            mem_output = parts[3]
+            mem_free = 0
+            for line in mem_output.split('\n'):
+                if "MemTotal:" in line:
+                    try:
+                        # MemTotal: 1234567 kB
+                        mem_total_mb = int(line.split()[1]) // 1024
+                    except (ValueError, IndexError):
+                        pass
+                elif "MemAvailable:" in line or "MemFree:" in line:
+                    try:
+                        mem_free = int(line.split()[1]) // 1024
+                    except (ValueError, IndexError):
+                        pass
+            mem_used_mb = mem_total_mb - mem_free
+        
+        # Parse storage
+        storage_used_gb, storage_total_gb = 0.0, 0.0
+        if len(parts) > 4:
+            storage_output = parts[4].strip()
+            # Format: /dev/... 32G 12G 20G 38% /data
+            storage_parts = storage_output.split()
+            if len(storage_parts) >= 4:
+                try:
+                    total_str = storage_parts[1]
+                    used_str = storage_parts[2]
+                    # Parse values like "32G", "12G", "500M"
+                    storage_total_gb = self._parse_size_to_gb(total_str)
+                    storage_used_gb = self._parse_size_to_gb(used_str)
+                except (ValueError, IndexError):
+                    pass
+        
+        return DeviceStatus(
+            screen_on=screen_on,
+            volume_level=current_vol,
+            volume_max=max_vol,
+            battery_level=battery_level,
+            battery_charging=battery_charging,
+            memory_used_mb=mem_used_mb,
+            memory_total_mb=mem_total_mb,
+            storage_used_gb=storage_used_gb,
+            storage_total_gb=storage_total_gb,
+        )
+
+    def _parse_size_to_gb(self, size_str: str) -> float:
+        """Parse size string like '32G', '500M', '1.5T' to GB."""
+        size_str = size_str.strip().upper()
+        if not size_str:
+            return 0.0
+        
+        multipliers = {'K': 1/1024/1024, 'M': 1/1024, 'G': 1, 'T': 1024}
+        unit = size_str[-1]
+        if unit in multipliers:
+            try:
+                return float(size_str[:-1]) * multipliers[unit]
+            except ValueError:
+                return 0.0
+        try:
+            return float(size_str)
+        except ValueError:
+            return 0.0
+
+    def take_screenshot(self) -> bytes | None:
+        """Capture a screenshot from the device.
+
+        Returns:
+            Screenshot as PNG bytes, or None if capture failed.
+        """
+        # Use screencap and encode as base64 to transfer binary data
+        result = self.shell("screencap -p | base64")
+        if result.stdout and len(result.stdout.strip()) > 100:
+            try:
+                screenshot_data = base64.b64decode(result.stdout.strip())
+                # Verify it's a valid PNG
+                if screenshot_data[:4] == b'\x89PNG':
+                    return screenshot_data
+            except Exception:
+                pass
+        return None
 
     def get_app_icon(self, package_name: str) -> bytes | None:
         """Extract app icon from APK.

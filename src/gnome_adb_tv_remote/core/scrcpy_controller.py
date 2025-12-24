@@ -57,6 +57,8 @@ AKEYCODE_MAP = {
     "KEYCODE_VOLUME_MUTE": 164,
     # Power
     "KEYCODE_POWER": 26,
+    "KEYCODE_SLEEP": 223,
+    "KEYCODE_WAKEUP": 224,
     # Media
     "KEYCODE_MEDIA_PLAY_PAUSE": 85,
     "KEYCODE_MEDIA_STOP": 86,
@@ -64,12 +66,19 @@ AKEYCODE_MAP = {
     "KEYCODE_MEDIA_PREVIOUS": 88,
     "KEYCODE_MEDIA_REWIND": 89,
     "KEYCODE_MEDIA_FAST_FORWARD": 90,
+    "KEYCODE_MEDIA_PLAY": 126,
+    "KEYCODE_MEDIA_PAUSE": 127,
+    "KEYCODE_MEDIA_RECORD": 130,
     # Apps & TV
     "KEYCODE_ALL_APPS": 284,
     "KEYCODE_TV": 170,
     "KEYCODE_TV_INPUT": 178,
     "KEYCODE_SETTINGS": 176,
     "KEYCODE_INFO": 165,
+    "KEYCODE_GUIDE": 172,
+    # Channels
+    "KEYCODE_CHANNEL_UP": 166,
+    "KEYCODE_CHANNEL_DOWN": 167,
     # Assistant
     "KEYCODE_ASSIST": 219,
     # Accessibility
@@ -81,6 +90,22 @@ AKEYCODE_MAP = {
     "KEYCODE_TAB": 61,
     "KEYCODE_SPACE": 62,
     "KEYCODE_ESCAPE": 111,
+    # Numpad (0-9 for channel input)
+    "KEYCODE_0": 7,
+    "KEYCODE_1": 8,
+    "KEYCODE_2": 9,
+    "KEYCODE_3": 10,
+    "KEYCODE_4": 11,
+    "KEYCODE_5": 12,
+    "KEYCODE_6": 13,
+    "KEYCODE_7": 14,
+    "KEYCODE_8": 15,
+    "KEYCODE_9": 16,
+    # Colored keys (Teletext/HbbTV)
+    "KEYCODE_PROG_RED": 183,
+    "KEYCODE_PROG_GREEN": 184,
+    "KEYCODE_PROG_YELLOW": 185,
+    "KEYCODE_PROG_BLUE": 186,
 }
 
 
