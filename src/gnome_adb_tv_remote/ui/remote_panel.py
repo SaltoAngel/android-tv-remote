@@ -148,6 +148,7 @@ class RemotePanel(Gtk.Box):
         self._volume_max: int = 15  # Will be updated from device
         self._on_volume_change = None  # Callback for volume changes
         self._updating_slider = False  # Prevent feedback loops
+        self._is_muted: bool = False  # Track mute state for UI toggle
 
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
@@ -483,9 +484,9 @@ class RemotePanel(Gtk.Box):
         mute_btn = Gtk.Button()
         mute_btn.add_css_class("volume-mute-button")
         mute_btn.set_tooltip_text("Mute")
-        mute_btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent("KEYCODE_VOLUME_MUTE"))
+        mute_btn.connect("clicked", self._on_mute_clicked)
         
-        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-muted-symbolic")
+        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
         mute_icon.set_pixel_size(24)
         mute_btn.set_child(mute_icon)
         volume_box.append(mute_btn)
@@ -512,18 +513,25 @@ class RemotePanel(Gtk.Box):
         
         new_value = int(slider.get_value())
         
+        # Unmute when volume is adjusted
+        if self._is_muted:
+            self._is_muted = False
+            self._update_mute_button_icon()
+        
         # Notify callback
         if self._on_volume_change:
             self._on_volume_change(new_value)
 
-    def update_volume(self, current: int, max_vol: int) -> None:
+    def update_volume(self, current: int, max_vol: int, is_muted: bool = False) -> None:
         """Update volume slider from device state.
         
         Args:
             current: Current volume level (0 to max_vol).
             max_vol: Maximum volume level.
+            is_muted: Whether the audio is muted.
         """
         self._volume_max = max_vol
+        self._is_muted = is_muted
         
         if self._volume_slider:
             self._updating_slider = True
@@ -531,3 +539,28 @@ class RemotePanel(Gtk.Box):
             adjustment.set_upper(max_vol)
             adjustment.set_value(current)
             self._updating_slider = False
+        
+        # Update mute button icon based on muted state
+        self._update_mute_button_icon()
+
+    def _update_mute_button_icon(self) -> None:
+        """Update the mute button icon based on current muted state."""
+        if self._mute_button:
+            child = self._mute_button.get_child()
+            if isinstance(child, Gtk.Image):
+                if self._is_muted:
+                    child.set_from_icon_name("audio-volume-muted-symbolic")
+                    self._mute_button.add_css_class("destructive-action")
+                else:
+                    child.set_from_icon_name("audio-volume-high-symbolic")
+                    self._mute_button.remove_css_class("destructive-action")
+
+    def _on_mute_clicked(self, *_args) -> None:
+        """Handle mute button click - toggle mute state and send keyevent."""
+        # Toggle mute state in UI
+        self._is_muted = not self._is_muted
+        self._update_mute_button_icon()
+        
+        # Send the keyevent to device
+        if self._on_keyevent:
+            self._on_keyevent("KEYCODE_VOLUME_MUTE")

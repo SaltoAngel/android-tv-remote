@@ -551,10 +551,10 @@ class MainWindow(Adw.ApplicationWindow):
             # Update volume slider when volume keys are pressed via keyboard shortcuts
             if keycode == "KEYCODE_VOLUME_UP":
                 self._current_volume = min(self._current_volume + 1, self._remote_panel._volume_max)
-                self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max)
+                self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max, False)
             elif keycode == "KEYCODE_VOLUME_DOWN":
                 self._current_volume = max(self._current_volume - 1, 0)
-                self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max)
+                self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max, False)
         except Exception as e:
             logger.error(f"scrcpy keyevent failed: {e}")
             self._toast("Failed to send command to TV.")
@@ -614,17 +614,17 @@ class MainWindow(Adw.ApplicationWindow):
         
         def worker():
             try:
-                current, max_vol = self._adb.get_volume_level()
-                GLib.idle_add(self._on_volume_fetched, current, max_vol)
+                current, max_vol, is_muted = self._adb.get_volume_level()
+                GLib.idle_add(self._on_volume_fetched, current, max_vol, is_muted)
             except Exception as e:
                 logger.error(f"Failed to get volume level: {e}")
         
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_volume_fetched(self, current: int, max_vol: int) -> None:
+    def _on_volume_fetched(self, current: int, max_vol: int, is_muted: bool) -> None:
         """Called when volume level is fetched from device."""
         self._current_volume = current
-        self._remote_panel.update_volume(current, max_vol)
+        self._remote_panel.update_volume(current, max_vol, is_muted)
 
     def _on_volume_change(self, new_volume: int) -> None:
         """Handle volume slider change.

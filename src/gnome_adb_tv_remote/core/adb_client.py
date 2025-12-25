@@ -333,11 +333,11 @@ class AdbTcpClient:
         # Look for "Display Power: state=ON" or similar
         return "state=ON" in result.stdout.upper()
 
-    def get_volume_level(self) -> tuple[int, int]:
+    def get_volume_level(self) -> tuple[int, int, bool]:
         """Get the current volume level for media stream.
 
         Returns:
-            Tuple of (current_volume, max_volume).
+            Tuple of (current_volume, max_volume, is_muted).
         """
         result = self.shell("dumpsys audio | sed -n '/- STREAM_MUSIC:/,/- STREAM_/p' | head -10")
         
@@ -351,13 +351,16 @@ class AdbTcpClient:
         #    Devices: hdmi
         current = 0
         max_vol = 15  # Default for most Android TVs
+        is_muted = False
         active_device = None
         current_line = ""
         stream_volume = None
         
         for line in result.stdout.split('\n'):
             line = line.strip()
-            if line.startswith("Max:"):
+            if line.startswith("Muted:"):
+                is_muted = line.split(":")[1].strip().lower() == "true"
+            elif line.startswith("Max:"):
                 try:
                     max_vol = int(line.split(":")[1].strip())
                 except (ValueError, IndexError):
@@ -398,7 +401,7 @@ class AdbTcpClient:
         if current == 0 and stream_volume is not None:
             current = stream_volume
         
-        return (current, max_vol)
+        return (current, max_vol, is_muted)
 
     def get_device_status(self) -> DeviceStatus:
         """Get comprehensive device status in a single call.
