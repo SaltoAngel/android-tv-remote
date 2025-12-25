@@ -39,9 +39,9 @@ ICONS_DIR = get_icons_dir()
 # CSS for compact button layout
 BUTTON_CSS = """
 button.tv-remote-button {
-    padding: 12px;
-    min-width: 80px;
-    min-height: 80px;
+    padding: 16px;
+    min-width: 110px;
+    min-height: 110px;
 }
 
 button.tv-remote-button image {
@@ -393,13 +393,13 @@ class TvRemoteDialog(Adw.Window):
                     file = Gio.File.new_for_path(path)
                     gicon = Gio.FileIcon.new(file)
                     image = Gtk.Image.new_from_gicon(gicon)
-                    image.set_pixel_size(24)
+                    image.set_pixel_size(40)
                     btn.set_child(image)
                 else:
                     btn.set_label(label)
             else:
                 image = Gtk.Image.new_from_icon_name(icon_name)
-                image.set_pixel_size(24)
+                image.set_pixel_size(40)
                 btn.set_child(image)
         else:
             btn.set_label(label)
