@@ -167,6 +167,8 @@ class TvRemoteDialog(Adw.Window):
         if self._title_widget:
             device_name = GLib.markup_escape_text(f"{device_info.manufacturer} {device_info.model}")
             self._title_widget.set_subtitle(device_name)
+        # Send Input button command to open input selection menu
+        self._send_input_command_to_tv()
 
     def _on_tv_connection_failed(self, message: str) -> None:
         """Called when TV connection fails."""
@@ -182,6 +184,23 @@ class TvRemoteDialog(Adw.Window):
                 pass
             self._tv_client = None
         self._connected = False
+
+    def _send_input_command_to_tv(self) -> None:
+        """Send KEYCODE_TV_INPUT command to TV device."""
+        if not self._connected or not self._tv_client:
+            return
+        
+        # Store reference to client for thread safety
+        client = self._tv_client
+        
+        def worker():
+            try:
+                # Send Input keycode (178 is KEYCODE_TV_INPUT)
+                client.shell("input keyevent 178")
+            except Exception as e:
+                logger.error(f"Failed to send Input command to TV: {e}")
+        
+        threading.Thread(target=worker, name="tv-input", daemon=True).start()
 
     def _send_keycode_to_tv(self, keycode: str) -> None:
         """Send keycode to TV device."""
