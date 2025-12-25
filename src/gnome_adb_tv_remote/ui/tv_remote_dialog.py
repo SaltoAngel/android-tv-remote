@@ -158,12 +158,11 @@ class TvRemoteDialog(Adw.Window):
         """Called when TV connection succeeds."""
         self._tv_client = client
         self._connected = True
-        self._status_label.set_text(f"Connected to {self._tv_ip}")
 
     def _on_tv_connection_failed(self, message: str) -> None:
         """Called when TV connection fails."""
-        self._status_label.set_text(message)
-        self._status_label.add_css_class("error")
+        # Connection failed - dialog will still work but commands won't be sent
+        pass
 
     def _disconnect_from_tv(self) -> None:
         """Disconnect from TV device."""
@@ -228,13 +227,6 @@ class TvRemoteDialog(Adw.Window):
         header.set_title_widget(Adw.WindowTitle(title="TV Remote", subtitle=self._tv_ip))
         toolbar_view.add_top_bar(header)
 
-        # Status label
-        self._status_label = Gtk.Label(label="Connecting...")
-        self._status_label.add_css_class("dim-label")
-        self._status_label.set_margin_top(8)
-        self._status_label.set_margin_bottom(8)
-        header.pack_start(self._status_label)
-
         # Apply CSS
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(BUTTON_CSS.encode())
@@ -267,16 +259,6 @@ class TvRemoteDialog(Adw.Window):
         self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, grid, icon_name="keyboard_arrow_down-symbolic.svg")
 
         content.append(grid)
-
-        # Info label
-        info_label = Gtk.Label(
-            label="Use d-pad shortcuts or click buttons to control TV. Press Escape to close.",
-            wrap=True,
-            justify=Gtk.Justification.CENTER,
-        )
-        info_label.add_css_class("dim-label")
-        info_label.set_margin_top(12)
-        content.append(info_label)
 
         toolbar_view.set_content(content)
 
