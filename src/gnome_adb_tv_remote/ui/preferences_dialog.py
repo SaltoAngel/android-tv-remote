@@ -27,7 +27,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "dpad-left": ["Left", "a"],
     "dpad-right": ["Right", "d"],
     "dpad-center": ["Return", "KP_Enter", "e"],
-    "back": ["Escape", "q"],
+    "back": ["Escape", "q", "BackSpace"],
     "home": ["h"],
     "menu": ["i", "Idotabove"],
     "volume-up": ["plus", "KP_Add", "period"],
