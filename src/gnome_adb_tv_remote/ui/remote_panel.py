@@ -247,6 +247,8 @@ class RemotePanel(Gtk.Box):
         self._keyboard_entry.set_editable(False)  # Disable text input, we handle keys manually
         self._keyboard_focused = False
         
+        self._focus_keyboard_shortcut_text: str = "Tab"  # Default
+
         # Add focus state tracking
         focus_controller = Gtk.EventControllerFocus()
         focus_controller.connect("enter", self._on_keyboard_focus_enter)
@@ -328,7 +330,9 @@ class RemotePanel(Gtk.Box):
         # Update keyboard entry placeholder with focus shortcut
         focus_tooltip = get_action_tooltip("focus-keyboard", settings)
         if focus_tooltip:
-            self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
+            self._focus_keyboard_shortcut_text = focus_tooltip
+            if not self._keyboard_focused:
+                self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
         
         # Update search button shortcut label
         if self._search_shortcut_label:
@@ -370,7 +374,7 @@ class RemotePanel(Gtk.Box):
     def _on_keyboard_focus_leave(self, *_args) -> None:
         """Called when keyboard input area loses focus."""
         self._keyboard_focused = False
-        self._keyboard_entry.set_placeholder_text("Press K to focus keyboard")
+        self._keyboard_entry.set_placeholder_text(f"Press {self._focus_keyboard_shortcut_text} to focus keyboard")
 
     @property
     def keyboard_focused(self) -> bool:

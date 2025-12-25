@@ -41,7 +41,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "assistant": ["g"],
     "captions": ["c"],
     "tv-input": ["t"],
-    "focus-keyboard": ["k"],
+    "focus-keyboard": ["Tab"],
     "search": ["f"],
 }
 
