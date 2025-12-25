@@ -95,22 +95,46 @@ class TvRemoteDialog(Adw.Window):
 
     def _on_close_request(self, *_args) -> bool:
         """Disconnect from TV and close the dialog."""
+        # Send Back command to TV before closing
+        self._send_back_command_to_tv()
         self._disconnect_from_tv()
         self.hide()
         return True
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
-        """Handle keyboard shortcuts for d-pad and Escape key."""
-        # Escape closes the dialog
+        """Handle keyboard shortcuts for d-pad, Escape, and Back keys."""
+        # Escape or Q (Back shortcut) closes the dialog after sending Back command
         if keyval == Gdk.KEY_Escape:
+            self._send_back_command_to_tv()
             self.close()
             return True
+        
+        # Check for Back key (Q)
+        from .preferences_dialog import ACTION_TO_KEYCODE, gdk_name_to_keyval, _load_shortcuts_dict
+        shortcuts = _load_shortcuts_dict(self._settings)
+        back_keys = shortcuts.get("back", [])
+        for key_name in back_keys:
+            keyval_back = gdk_name_to_keyval(key_name)
+            if keyval_back and (keyval == keyval_back or Gdk.keyval_to_lower(keyval) == keyval_back):
+                self._send_back_command_to_tv()
+                self.close()
+                return True
         
         # Handle d-pad shortcuts
         lower_keyval = Gdk.keyval_to_lower(keyval)
         keycode = self._key_map.get(keyval) or self._key_map.get(lower_keyval)
         
         if keycode and keycode in DPAD_KEYCODES:
+            # If OK/Select (KEYCODE_DPAD_CENTER), close dialog after sending command
+            if keycode == "KEYCODE_DPAD_CENTER":
+                # Flash the button
+                self._flash_button(keycode)
+                # Send command to TV
+                self._send_keycode_to_tv(keycode)
+                # Close dialog after a short delay
+                GLib.timeout_add(100, lambda: self.close() or False)
+                return True
+            
             # Flash the button
             self._flash_button(keycode)
             # Send command to TV
@@ -138,6 +162,38 @@ class TvRemoteDialog(Adw.Window):
                 keyval = gdk_name_to_keyval(key_name)
                 if keyval is not None:
                     self._key_map[keyval] = keycode
+
+    def _update_button_tooltips(self) -> None:
+        """Update button tooltips with keyboard shortcuts."""
+        from .preferences_dialog import get_action_tooltip
+        
+        # Mapping from keycode to action name
+        keycode_to_action = {
+            "KEYCODE_DPAD_UP": "dpad-up",
+            "KEYCODE_DPAD_DOWN": "dpad-down",
+            "KEYCODE_DPAD_LEFT": "dpad-left",
+            "KEYCODE_DPAD_RIGHT": "dpad-right",
+            "KEYCODE_DPAD_CENTER": "dpad-center",
+        }
+        
+        # Human-readable names
+        keycode_to_label = {
+            "KEYCODE_DPAD_UP": "Up",
+            "KEYCODE_DPAD_DOWN": "Down",
+            "KEYCODE_DPAD_LEFT": "Left",
+            "KEYCODE_DPAD_RIGHT": "Right",
+            "KEYCODE_DPAD_CENTER": "OK / Select",
+        }
+        
+        for keycode, button in self._keycode_buttons.items():
+            action = keycode_to_action.get(keycode)
+            label = keycode_to_label.get(keycode, "")
+            if action:
+                shortcut_text = get_action_tooltip(action, self._settings)
+                if shortcut_text:
+                    button.set_tooltip_text(f"{label}: {shortcut_text}")
+                else:
+                    button.set_tooltip_text(label)
 
     def _connect_to_tv_async(self) -> None:
         """Connect to TV device in background thread."""
@@ -201,6 +257,23 @@ class TvRemoteDialog(Adw.Window):
                 logger.error(f"Failed to send Input command to TV: {e}")
         
         threading.Thread(target=worker, name="tv-input", daemon=True).start()
+
+    def _send_back_command_to_tv(self) -> None:
+        """Send KEYCODE_BACK command to TV device."""
+        if not self._connected or not self._tv_client:
+            return
+        
+        # Store reference to client for thread safety
+        client = self._tv_client
+        
+        def worker():
+            try:
+                # Send Back keycode (4 is KEYCODE_BACK)
+                client.shell("input keyevent 4")
+            except Exception as e:
+                logger.error(f"Failed to send Back command to TV: {e}")
+        
+        threading.Thread(target=worker, name="tv-back", daemon=True).start()
 
     def _send_keycode_to_tv(self, keycode: str) -> None:
         """Send keycode to TV device."""
@@ -290,6 +363,9 @@ class TvRemoteDialog(Adw.Window):
         content.append(grid)
 
         toolbar_view.set_content(content)
+        
+        # Update tooltips after buttons are created
+        self._update_button_tooltips()
 
     def _add_key_button(self, label: str, keycode: str, col: int, row: int, grid: Gtk.Grid, icon_name: str | None = None) -> None:
         """Add a key button to the grid."""
