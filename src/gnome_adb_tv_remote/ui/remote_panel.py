@@ -20,7 +20,7 @@ from ..core.adb_client import DeviceInfo  # noqa: E402
 from .ui_utils import create_icon, flash_button  # noqa: E402
 
 
-# CSS for larger button fonts
+# CSS for larger button fonts and volume slider
 BUTTON_CSS = """
 button.remote-button {
     padding: 12px;
@@ -38,6 +38,30 @@ button.remote-button label.caption {
     opacity: 0.9;
     margin-top: 4px;
 }
+
+.volume-slider-box {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.volume-slider-box scale {
+    min-height: 32px;
+}
+
+.volume-slider-box scale trough {
+    min-height: 8px;
+    border-radius: 4px;
+}
+
+.volume-slider-box scale highlight {
+    border-radius: 4px;
+}
+
+.volume-mute-button {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 8px;
+}
 """
 
 
@@ -51,8 +75,6 @@ KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_BACK": "back",
     "KEYCODE_HOME": "home",
     "KEYCODE_MENU": "menu",
-    "KEYCODE_VOLUME_UP": "volume-up",
-    "KEYCODE_VOLUME_DOWN": "volume-down",
     "KEYCODE_VOLUME_MUTE": "volume-mute",
     "KEYCODE_MEDIA_PLAY_PAUSE": "play-pause",
     "KEYCODE_MEDIA_PREVIOUS": "previous",
@@ -119,6 +141,13 @@ class RemotePanel(Gtk.Box):
         # Search button (special, sends text instead of keycode)
         self._search_button: Gtk.Button | None = None
         self._search_shortcut_label: Gtk.Label | None = None
+        
+        # Volume slider components
+        self._volume_slider: Gtk.Scale | None = None
+        self._mute_button: Gtk.Button | None = None
+        self._volume_max: int = 15  # Will be updated from device
+        self._on_volume_change = None  # Callback for volume changes
+        self._updating_slider = False  # Prevent feedback loops
 
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
@@ -132,10 +161,8 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
         self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="view-list-symbolic")
 
-        # Volume
-        self._add_key_button("Vol-", "KEYCODE_VOLUME_DOWN", 0, 4, icon_name="audio-volume-low-symbolic")
-        self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="audio-volume-muted-symbolic")
-        self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
+        # Volume slider row (spans all 3 columns)
+        self._add_volume_slider(row=4)
 
         # Media - Row 5: Play/Pause
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
@@ -167,9 +194,10 @@ class RemotePanel(Gtk.Box):
         
         self.append(self._keyboard_entry)
 
-    def set_handlers(self, *, on_keyevent=None, on_text=None) -> None:
+    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None) -> None:
         self._on_keyevent = on_keyevent
         self._on_text = on_text
+        self._on_volume_change = on_volume_change
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
@@ -442,5 +470,64 @@ class RemotePanel(Gtk.Box):
         self._search_button = btn
         self._search_shortcut_label = shortcut_label
 
+    def _add_volume_slider(self, row: int) -> None:
+        """Add volume slider with mute button to the grid."""
+        # Create container box for the whole volume row
+        volume_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        volume_box.add_css_class("volume-slider-box")
+        volume_box.set_hexpand(True)
+        volume_box.set_vexpand(True)
+        volume_box.set_valign(Gtk.Align.CENTER)
+        
+        # Mute button
+        mute_btn = Gtk.Button()
+        mute_btn.add_css_class("volume-mute-button")
+        mute_btn.set_tooltip_text("Mute")
+        mute_btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent("KEYCODE_VOLUME_MUTE"))
+        
+        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-muted-symbolic")
+        mute_icon.set_pixel_size(24)
+        mute_btn.set_child(mute_icon)
+        volume_box.append(mute_btn)
+        self._mute_button = mute_btn
+        self._keycode_buttons["KEYCODE_VOLUME_MUTE"] = mute_btn
+        
+        # Volume slider
+        adjustment = Gtk.Adjustment(value=0, lower=0, upper=15, step_increment=1, page_increment=1)
+        slider = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adjustment)
+        slider.set_hexpand(True)
+        slider.set_draw_value(False)
+        slider.set_tooltip_text("Volume")
+        slider.connect("value-changed", self._on_slider_changed)
+        volume_box.append(slider)
+        self._volume_slider = slider
+        
+        # Attach to grid spanning all 3 columns
+        self._grid.attach(volume_box, 0, row, 3, 1)
 
+    def _on_slider_changed(self, slider: Gtk.Scale) -> None:
+        """Called when slider value changes."""
+        if self._updating_slider:
+            return
+        
+        new_value = int(slider.get_value())
+        
+        # Notify callback
+        if self._on_volume_change:
+            self._on_volume_change(new_value)
 
+    def update_volume(self, current: int, max_vol: int) -> None:
+        """Update volume slider from device state.
+        
+        Args:
+            current: Current volume level (0 to max_vol).
+            max_vol: Maximum volume level.
+        """
+        self._volume_max = max_vol
+        
+        if self._volume_slider:
+            self._updating_slider = True
+            adjustment = self._volume_slider.get_adjustment()
+            adjustment.set_upper(max_vol)
+            adjustment.set_value(current)
+            self._updating_slider = False

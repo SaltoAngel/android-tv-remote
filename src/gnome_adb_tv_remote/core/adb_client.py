@@ -339,17 +339,21 @@ class AdbTcpClient:
         Returns:
             Tuple of (current_volume, max_volume).
         """
-        result = self.shell("dumpsys audio | grep -A 10 'STREAM_MUSIC'")
+        result = self.shell("dumpsys audio | sed -n '/- STREAM_MUSIC:/,/- STREAM_/p' | head -10")
         
         # Parse output like:
         # - STREAM_MUSIC:
         #    Muted: false
         #    Min: 0
         #    Max: 15
-        #    ...
-        #    Current: 2 (speaker): 8, ...
+        #    streamVolume:6
+        #    Current: 2 (speaker): 8, 400 (hdmi): 6, ...
+        #    Devices: hdmi
         current = 0
         max_vol = 15  # Default for most Android TVs
+        active_device = None
+        current_line = ""
+        stream_volume = None
         
         for line in result.stdout.split('\n'):
             line = line.strip()
@@ -358,15 +362,41 @@ class AdbTcpClient:
                     max_vol = int(line.split(":")[1].strip())
                 except (ValueError, IndexError):
                     pass
-            elif "Current:" in line and "(speaker)" in line:
-                # Parse "Current: 2 (speaker): 8, ..."
+            elif line.startswith("streamVolume:"):
+                # Fallback value: streamVolume:6
                 try:
-                    # Find the value after "(speaker):"
-                    parts = line.split("(speaker):")
-                    if len(parts) > 1:
-                        current = int(parts[1].split(",")[0].strip())
+                    stream_volume = int(line.split(":")[1].strip())
                 except (ValueError, IndexError):
                     pass
+            elif line.startswith("Current:"):
+                current_line = line
+            elif line.startswith("Devices:"):
+                # Get active device: "Devices: hdmi" or "Devices: speaker"
+                try:
+                    active_device = line.split(":")[1].strip()
+                except (ValueError, IndexError):
+                    pass
+        
+        # Parse current volume based on active device
+        if current_line and active_device:
+            # Map device names to their IDs in the Current line
+            # Common mappings: speaker=2, headset=4, headphone=8, bt_a2dp=80, hdmi=400
+            device_patterns = [
+                f"({active_device}):",  # e.g., "(hdmi):" or "(speaker):"
+            ]
+            for pattern in device_patterns:
+                if pattern in current_line:
+                    try:
+                        parts = current_line.split(pattern)
+                        if len(parts) > 1:
+                            current = int(parts[1].split(",")[0].strip())
+                            break
+                    except (ValueError, IndexError):
+                        pass
+        
+        # Use streamVolume as fallback if we couldn't parse the current volume
+        if current == 0 and stream_volume is not None:
+            current = stream_volume
         
         return (current, max_vol)
 
@@ -379,7 +409,7 @@ class AdbTcpClient:
         sep = "|||STATUS_SEP|||"
         cmd = f"""
 dumpsys power | grep 'Display Power'; echo '{sep}'
-dumpsys audio | grep -A 10 'STREAM_MUSIC'; echo '{sep}'
+dumpsys audio | sed -n '/- STREAM_MUSIC:/,/- STREAM_/p' | head -10; echo '{sep}'
 dumpsys battery; echo '{sep}'
 cat /proc/meminfo | head -3; echo '{sep}'
 df -h /data | tail -1
@@ -390,10 +420,14 @@ df -h /data | tail -1
         # Parse power state
         screen_on = "state=ON" in (parts[0] if len(parts) > 0 else "").upper()
         
-        # Parse volume
+        # Parse volume (same logic as get_volume_level)
         current_vol, max_vol = 0, 15
         if len(parts) > 1:
             audio_output = parts[1]
+            active_device = None
+            current_line = ""
+            stream_volume = None
+            
             for line in audio_output.split('\n'):
                 line = line.strip()
                 if line.startswith("Max:"):
@@ -401,13 +435,33 @@ df -h /data | tail -1
                         max_vol = int(line.split(":")[1].strip())
                     except (ValueError, IndexError):
                         pass
-                elif "Current:" in line and "(speaker)" in line:
+                elif line.startswith("streamVolume:"):
                     try:
-                        vol_parts = line.split("(speaker):")
+                        stream_volume = int(line.split(":")[1].strip())
+                    except (ValueError, IndexError):
+                        pass
+                elif line.startswith("Current:"):
+                    current_line = line
+                elif line.startswith("Devices:"):
+                    try:
+                        active_device = line.split(":")[1].strip()
+                    except (ValueError, IndexError):
+                        pass
+            
+            # Parse current volume based on active device
+            if current_line and active_device:
+                pattern = f"({active_device}):"
+                if pattern in current_line:
+                    try:
+                        vol_parts = current_line.split(pattern)
                         if len(vol_parts) > 1:
                             current_vol = int(vol_parts[1].split(",")[0].strip())
                     except (ValueError, IndexError):
                         pass
+            
+            # Use streamVolume as fallback
+            if current_vol == 0 and stream_volume is not None:
+                current_vol = stream_volume
         
         # Parse battery (may not be available on TVs)
         battery_level = None

@@ -87,7 +87,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._build_ui()
         self._create_actions()
-        self._remote_panel.set_handlers(on_keyevent=self._on_remote_keyevent, on_text=self._on_remote_text)
+        self._remote_panel.set_handlers(
+            on_keyevent=self._on_remote_keyevent,
+            on_text=self._on_remote_text,
+            on_volume_change=self._on_volume_change,
+        )
+        
+        # Track current volume for slider changes
+        self._current_volume: int = 0
         self._remote_panel.update_tooltips(self._settings)
         # Update Power button tooltip
         self.reload_shortcuts()
@@ -407,6 +414,9 @@ class MainWindow(Adw.ApplicationWindow):
             self._remote_panel.set_sensitive(True)
         self._remote_panel.set_connection_status(None)  # Hide status on success
         logger.info("scrcpy-server connected - low-latency input enabled (no window)")
+        
+        # Fetch initial volume level
+        self._update_volume_slider()
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -537,6 +547,14 @@ class MainWindow(Adw.ApplicationWindow):
 
         try:
             scrcpy.send_keycode(keycode)
+            
+            # Update volume slider when volume keys are pressed via keyboard shortcuts
+            if keycode == "KEYCODE_VOLUME_UP":
+                self._current_volume = min(self._current_volume + 1, self._remote_panel._volume_max)
+                self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max)
+            elif keycode == "KEYCODE_VOLUME_DOWN":
+                self._current_volume = max(self._current_volume - 1, 0)
+                self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max)
         except Exception as e:
             logger.error(f"scrcpy keyevent failed: {e}")
             self._toast("Failed to send command to TV.")
@@ -588,3 +606,42 @@ class MainWindow(Adw.ApplicationWindow):
                 self._on_remote_text(text)
         except Exception as e:
             logger.error(f"Failed to read clipboard: {e}")
+
+    def _update_volume_slider(self) -> None:
+        """Fetch volume level from device and update the slider."""
+        if not self._adb or not self._adb.connected:
+            return
+        
+        def worker():
+            try:
+                current, max_vol = self._adb.get_volume_level()
+                GLib.idle_add(self._on_volume_fetched, current, max_vol)
+            except Exception as e:
+                logger.error(f"Failed to get volume level: {e}")
+        
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_volume_fetched(self, current: int, max_vol: int) -> None:
+        """Called when volume level is fetched from device."""
+        self._current_volume = current
+        self._remote_panel.update_volume(current, max_vol)
+
+    def _on_volume_change(self, new_volume: int) -> None:
+        """Handle volume slider change.
+        
+        Since Android doesn't have a direct "set volume" command via scrcpy,
+        we send VOLUME_UP or VOLUME_DOWN events to adjust the volume.
+        """
+        scrcpy = self._scrcpy
+        if not scrcpy or not scrcpy.connected:
+            return
+        
+        diff = new_volume - self._current_volume
+        keycode = "KEYCODE_VOLUME_UP" if diff > 0 else "KEYCODE_VOLUME_DOWN"
+        
+        try:
+            for _ in range(abs(diff)):
+                scrcpy.send_keycode(keycode)
+            self._current_volume = new_volume
+        except Exception as e:
+            logger.error(f"Failed to adjust volume: {e}")
