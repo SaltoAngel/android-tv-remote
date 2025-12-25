@@ -58,6 +58,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._connected_ip: str | None = None
         self._adb: AdbTcpClient | None = None
         self._scrcpy: ScrcpyServerController | None = None
+        # Secondary scrcpy connection for TV Input Routing
+        self._tv_adb: AdbTcpClient | None = None
+        self._tv_scrcpy: ScrcpyServerController | None = None
         self._connect_thread: threading.Thread | None = None
         self._connect_silent: bool = False
         self._device_dialog: DeviceDialog | None = None
@@ -306,6 +309,19 @@ class MainWindow(Adw.ApplicationWindow):
                 except Exception:
                     pass
                 self._scrcpy = None
+            # Also cleanup TV scrcpy if exists
+            if self._tv_scrcpy:
+                try:
+                    self._tv_scrcpy.disconnect()
+                except Exception:
+                    pass
+                self._tv_scrcpy = None
+            if self._tv_adb:
+                try:
+                    self._tv_adb.disconnect()
+                except Exception:
+                    pass
+                self._tv_adb = None
 
     def _on_connect_ip_action(self, _action: Gio.SimpleAction, parameter: GLib.Variant) -> None:
         """Handler for the connect_ip action."""
@@ -417,6 +433,11 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Fetch initial volume level
         self._update_volume_slider()
+        
+        # Start secondary scrcpy connection for TV Input Routing if configured
+        tv_ip = self._settings.get_string("tv-ip")
+        if tv_ip and tv_ip.strip():
+            self._start_tv_scrcpy_async(tv_ip.strip())
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -448,6 +469,19 @@ class MainWindow(Adw.ApplicationWindow):
             except Exception:
                 pass
             self._scrcpy = None
+        # Disconnect TV scrcpy if exists
+        if self._tv_scrcpy:
+            try:
+                self._tv_scrcpy.disconnect()
+            except Exception:
+                pass
+            self._tv_scrcpy = None
+        if self._tv_adb:
+            try:
+                self._tv_adb.disconnect()
+            except Exception:
+                pass
+            self._tv_adb = None
         # Then disconnect ADB
         if self._adb:
             try:
@@ -530,13 +564,14 @@ class MainWindow(Adw.ApplicationWindow):
         """Send a key event to the device using scrcpy-server.
 
         Requires scrcpy-server connection for low-latency input (~35-70ms).
-        Special handling: If keycode is KEYCODE_TV_INPUT and TV IP is configured,
-        open the TV remote dialog instead of sending a single command.
+        Special handling: If keycode is KEYCODE_TV_INPUT and TV scrcpy is connected,
+        send command directly to TV device for faster response.
         """
-        # Special handling for Input button: open TV remote dialog if configured
+        # Special handling for Input button: open dialog (it will send Input command when connected)
         if keycode == "KEYCODE_TV_INPUT":
             tv_ip = self._settings.get_string("tv-ip")
             if tv_ip and tv_ip.strip():
+                # Open dialog - it will send Input command automatically when connected
                 self._open_tv_remote_dialog(tv_ip.strip())
                 return
         
@@ -581,12 +616,13 @@ class MainWindow(Adw.ApplicationWindow):
         This is used when a TV IP is configured separately from the connected device
         (e.g., when connected to Mi Box but want to control TV Input).
         """
-        # Close existing dialog if open
+        # Destroy existing dialog if it exists
         if self._tv_remote_dialog:
-            self._tv_remote_dialog.close()
+            self._tv_remote_dialog.destroy()
+            self._tv_remote_dialog = None
         
-        # Create and show new dialog
-        self._tv_remote_dialog = TvRemoteDialog(self, tv_ip, self._settings)
+        # Always create a fresh dialog, passing TV scrcpy for fast commands
+        self._tv_remote_dialog = TvRemoteDialog(self, tv_ip, self._settings, self._tv_scrcpy)
         self._tv_remote_dialog.present()
 
     def _paste_clipboard(self) -> None:
@@ -645,3 +681,36 @@ class MainWindow(Adw.ApplicationWindow):
             self._current_volume = new_volume
         except Exception as e:
             logger.error(f"Failed to adjust volume: {e}")
+
+    def _start_tv_scrcpy_async(self, tv_ip: str) -> None:
+        """Start scrcpy-server for TV Input Routing in background.
+        
+        This establishes a second scrcpy connection to the TV device specified
+        in settings, enabling faster Input button operations.
+        """
+        def worker():
+            try:
+                # Create ADB client for TV device
+                tv_client = AdbTcpClient(tv_ip, port=5555, timeout_s=8.0)
+                tv_client.connect()
+                
+                # Create scrcpy controller for TV
+                tv_scrcpy = ScrcpyServerController(tv_client)
+                tv_scrcpy.connect()
+                
+                GLib.idle_add(self._on_tv_scrcpy_connected, tv_client, tv_scrcpy)
+            except Exception as e:
+                logger.warning(f"TV scrcpy connection failed for {tv_ip}: {e}")
+                GLib.idle_add(self._on_tv_scrcpy_failed)
+        
+        threading.Thread(target=worker, name="tv-scrcpy-connect", daemon=True).start()
+    
+    def _on_tv_scrcpy_connected(self, tv_adb: AdbTcpClient, tv_scrcpy: ScrcpyServerController) -> None:
+        """Called when TV scrcpy connects successfully."""
+        self._tv_adb = tv_adb
+        self._tv_scrcpy = tv_scrcpy
+        logger.info(f"TV scrcpy connected to {tv_adb.host} - Input button will use fast connection")
+    
+    def _on_tv_scrcpy_failed(self) -> None:
+        """Called when TV scrcpy fails to connect."""
+        logger.info("TV scrcpy unavailable - Input button will use dialog method")

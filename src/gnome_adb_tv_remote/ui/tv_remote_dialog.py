@@ -3,13 +3,12 @@ TV Remote Dialog for controlling external TV device.
 
 This module provides the TvRemoteDialog class, a modal dialog that displays
 a d-pad interface for controlling a separate TV device when the Input button
-is used with an external TV IP configured.
+is used with an external TV IP configured. Uses scrcpy for fast command delivery.
 """
 
 from __future__ import annotations
 
 import logging
-import threading
 
 import gi
 
@@ -19,7 +18,6 @@ gi.require_version("Gdk", "4.0")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
 from .preferences_dialog import get_action_tooltip, _load_shortcuts_dict  # noqa: E402
 from .ui_utils import create_icon, flash_button  # noqa: E402
 
@@ -49,9 +47,9 @@ DPAD_KEYCODES = {
 
 
 class TvRemoteDialog(Adw.Window):
-    """Modal dialog for controlling external TV device with d-pad."""
+    """Modal dialog for controlling external TV device with d-pad via scrcpy."""
 
-    def __init__(self, parent: Gtk.Window, tv_ip: str, settings: Gio.Settings) -> None:
+    def __init__(self, parent: Gtk.Window, tv_ip: str, settings: Gio.Settings, tv_scrcpy=None) -> None:
         super().__init__(
             transient_for=parent,
             modal=True,
@@ -62,17 +60,16 @@ class TvRemoteDialog(Adw.Window):
         
         self._tv_ip = tv_ip
         self._settings = settings
-        self._tv_client: AdbTcpClient | None = None
-        self._connected = False
+        self._tv_scrcpy = tv_scrcpy  # ScrcpyServerController for fast commands
         self._key_map: dict[int, str] = {}
-        self._device_info: DeviceInfo | None = None
         self._title_widget: Adw.WindowTitle | None = None
         
         self._build_ui()
         self._load_dpad_shortcuts()
         
-        # Connect to TV in background
-        self._connect_to_tv_async()
+        # Send Input command immediately via scrcpy
+        if self._tv_scrcpy and self._tv_scrcpy.connected:
+            self._send_input_command_to_tv()
         
         # Add keyboard controller for shortcuts and Escape
         key_controller = Gtk.EventControllerKey()
@@ -83,10 +80,9 @@ class TvRemoteDialog(Adw.Window):
         self.connect("close-request", self._on_close_request)
 
     def _on_close_request(self, *_args) -> bool:
-        """Disconnect from TV and close the dialog."""
+        """Send Input command and close the dialog."""
         # Send Input command to TV before closing (to toggle input menu)
-        # Disconnect will happen after command is sent (via callback)
-        self._send_input_command_to_tv(on_complete=self._disconnect_from_tv)
+        self._send_input_command_to_tv()
         self.hide()
         return True
 
@@ -182,107 +178,25 @@ class TvRemoteDialog(Adw.Window):
                 else:
                     button.set_tooltip_text(label)
 
-    def _connect_to_tv_async(self) -> None:
-        """Connect to TV device in background thread."""
-        def worker():
-            try:
-                client = AdbTcpClient(self._tv_ip, port=5555, timeout_s=5.0)
-                client.connect()
-                # Get device info after connection
-                device_info = client.get_device_info()
-                GLib.idle_add(self._on_tv_connected, client, device_info)
-            except AdbAuthRequiredError:
-                GLib.idle_add(self._on_tv_connection_failed, f"TV {self._tv_ip} requires authorization. Please pair first.")
-            except AdbConnectError as e:
-                GLib.idle_add(self._on_tv_connection_failed, f"Failed to connect to TV {self._tv_ip}: {str(e)}")
-            except Exception as e:
-                logger.error(f"Error connecting to TV {self._tv_ip}: {e}")
-                GLib.idle_add(self._on_tv_connection_failed, f"Error connecting to TV")
-        
-        threading.Thread(target=worker, name="tv-connect", daemon=True).start()
-
-    def _on_tv_connected(self, client: AdbTcpClient, device_info: DeviceInfo) -> None:
-        """Called when TV connection succeeds."""
-        self._tv_client = client
-        self._connected = True
-        self._device_info = device_info
-        # Update subtitle with device name
-        if self._title_widget:
-            device_name = GLib.markup_escape_text(f"{device_info.manufacturer} {device_info.model}")
-            self._title_widget.set_subtitle(device_name)
-        # Send Input button command to open input selection menu
-        self._send_input_command_to_tv()
-
-    def _on_tv_connection_failed(self, message: str) -> None:
-        """Called when TV connection fails."""
-        # Connection failed - dialog will still work but commands won't be sent
-        pass
-
-    def _disconnect_from_tv(self) -> None:
-        """Disconnect from TV device."""
-        if self._tv_client:
-            try:
-                self._tv_client.disconnect()
-            except Exception:
-                pass
-            self._tv_client = None
-        self._connected = False
-
-    def _send_input_command_to_tv(self, on_complete: callable = None) -> None:
-        """Send KEYCODE_TV_INPUT command to TV device.
-        
-        Args:
-            on_complete: Optional callback to call when command is sent (or fails).
-        """
-        if not self._connected or not self._tv_client:
-            if on_complete:
-                GLib.idle_add(on_complete)
+    def _send_input_command_to_tv(self) -> None:
+        """Send KEYCODE_TV_INPUT command to TV device via scrcpy."""
+        if not self._tv_scrcpy or not self._tv_scrcpy.connected:
             return
         
-        # Store reference to client for thread safety
-        client = self._tv_client
-        
-        def worker():
-            try:
-                # Send Input keycode (178 is KEYCODE_TV_INPUT)
-                client.shell("input keyevent 178")
-            except Exception as e:
-                # Use debug level since errors during dialog close are expected
-                logger.debug(f"Failed to send Input command to TV: {e}")
-            finally:
-                if on_complete:
-                    GLib.idle_add(on_complete)
-        
-        threading.Thread(target=worker, name="tv-input", daemon=True).start()
+        try:
+            self._tv_scrcpy.send_keycode("KEYCODE_TV_INPUT")
+        except Exception as e:
+            logger.error(f"Failed to send Input command via scrcpy: {e}")
 
     def _send_keycode_to_tv(self, keycode: str) -> None:
-        """Send keycode to TV device."""
-        if not self._connected or not self._tv_client:
+        """Send keycode to TV device via scrcpy."""
+        if not self._tv_scrcpy or not self._tv_scrcpy.connected:
             return
         
-        # Store reference to client for thread safety
-        client = self._tv_client
-        
-        def worker():
-            try:
-                # Send keycode using ADB shell
-                # Map keycode name to numeric value
-                keycode_map = {
-                    "KEYCODE_DPAD_UP": 19,
-                    "KEYCODE_DPAD_DOWN": 20,
-                    "KEYCODE_DPAD_LEFT": 21,
-                    "KEYCODE_DPAD_RIGHT": 22,
-                    "KEYCODE_DPAD_CENTER": 23,
-                }
-                keycode_num = keycode_map.get(keycode)
-                if keycode_num is not None and client:
-                    client.shell(f"input keyevent {keycode_num}")
-            except Exception as e:
-                logger.error(f"Failed to send keycode {keycode} to TV: {e}")
-                GLib.idle_add(self._on_tv_connection_failed, "Connection lost")
-                GLib.idle_add(self._disconnect_from_tv)
-        
-        threading.Thread(target=worker, name="tv-keycode", daemon=True).start()
+        try:
+            self._tv_scrcpy.send_keycode(keycode)
+        except Exception as e:
+            logger.error(f"Failed to send keycode {keycode} via scrcpy: {e}")
 
     def _flash_button(self, keycode: str) -> None:
         """Flash the button corresponding to the keycode."""
@@ -358,4 +272,3 @@ class TvRemoteDialog(Adw.Window):
         
         grid.attach(btn, col, row, 1, 1)
         self._keycode_buttons[keycode] = btn
-
