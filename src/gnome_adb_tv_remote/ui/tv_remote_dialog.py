@@ -20,7 +20,7 @@ gi.require_version("Gdk", "4.0")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
-from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient  # noqa: E402
+from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
 from .preferences_dialog import get_action_tooltip, _load_shortcuts_dict  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -36,12 +36,12 @@ def get_icons_dir():
 
 ICONS_DIR = get_icons_dir()
 
-# CSS for larger button fonts
+# CSS for compact button layout
 BUTTON_CSS = """
 button.tv-remote-button {
-    padding: 16px;
-    min-width: 100px;
-    min-height: 100px;
+    padding: 12px;
+    min-width: 80px;
+    min-height: 80px;
 }
 
 button.tv-remote-button image {
@@ -67,8 +67,8 @@ class TvRemoteDialog(Adw.Window):
             transient_for=parent,
             modal=True,
             title="TV Remote",
-            default_width=350,
-            default_height=350,
+            default_width=280,
+            default_height=280,
         )
         
         self._tv_ip = tv_ip
@@ -76,6 +76,8 @@ class TvRemoteDialog(Adw.Window):
         self._tv_client: AdbTcpClient | None = None
         self._connected = False
         self._key_map: dict[int, str] = {}
+        self._device_info: DeviceInfo | None = None
+        self._title_widget: Adw.WindowTitle | None = None
         
         self._build_ui()
         self._load_dpad_shortcuts()
@@ -143,7 +145,9 @@ class TvRemoteDialog(Adw.Window):
             try:
                 client = AdbTcpClient(self._tv_ip, port=5555, timeout_s=5.0)
                 client.connect()
-                GLib.idle_add(self._on_tv_connected, client)
+                # Get device info after connection
+                device_info = client.get_device_info()
+                GLib.idle_add(self._on_tv_connected, client, device_info)
             except AdbAuthRequiredError:
                 GLib.idle_add(self._on_tv_connection_failed, f"TV {self._tv_ip} requires authorization. Please pair first.")
             except AdbConnectError as e:
@@ -154,10 +158,15 @@ class TvRemoteDialog(Adw.Window):
         
         threading.Thread(target=worker, name="tv-connect", daemon=True).start()
 
-    def _on_tv_connected(self, client: AdbTcpClient) -> None:
+    def _on_tv_connected(self, client: AdbTcpClient, device_info: DeviceInfo) -> None:
         """Called when TV connection succeeds."""
         self._tv_client = client
         self._connected = True
+        self._device_info = device_info
+        # Update subtitle with device name
+        if self._title_widget:
+            device_name = GLib.markup_escape_text(f"{device_info.manufacturer} {device_info.model}")
+            self._title_widget.set_subtitle(device_name)
 
     def _on_tv_connection_failed(self, message: str) -> None:
         """Called when TV connection fails."""
@@ -224,7 +233,8 @@ class TvRemoteDialog(Adw.Window):
         self.set_content(toolbar_view)
 
         header = Adw.HeaderBar()
-        header.set_title_widget(Adw.WindowTitle(title="TV Remote", subtitle=self._tv_ip))
+        self._title_widget = Adw.WindowTitle(title="TV Remote", subtitle=self._tv_ip)
+        header.set_title_widget(self._title_widget)
         toolbar_view.add_top_bar(header)
 
         # Apply CSS
@@ -233,16 +243,16 @@ class TvRemoteDialog(Adw.Window):
         self.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         # Content
-        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content.set_margin_top(24)
-        content.set_margin_bottom(24)
-        content.set_margin_start(24)
-        content.set_margin_end(24)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
         content.set_valign(Gtk.Align.CENTER)
         content.set_halign(Gtk.Align.CENTER)
 
         # D-pad grid
-        grid = Gtk.Grid(column_spacing=10, row_spacing=10)
+        grid = Gtk.Grid(column_spacing=8, row_spacing=8)
         grid.set_column_homogeneous(True)
         grid.set_row_homogeneous(True)
         grid.set_halign(Gtk.Align.CENTER)
@@ -280,13 +290,13 @@ class TvRemoteDialog(Adw.Window):
                     file = Gio.File.new_for_path(path)
                     gicon = Gio.FileIcon.new(file)
                     image = Gtk.Image.new_from_gicon(gicon)
-                    image.set_pixel_size(32)
+                    image.set_pixel_size(24)
                     btn.set_child(image)
                 else:
                     btn.set_label(label)
             else:
                 image = Gtk.Image.new_from_icon_name(icon_name)
-                image.set_pixel_size(32)
+                image.set_pixel_size(24)
                 btn.set_child(image)
         else:
             btn.set_label(label)
