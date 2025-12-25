@@ -9,7 +9,6 @@ is used with an external TV IP configured.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 
 import gi
@@ -22,19 +21,9 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
 from .preferences_dialog import get_action_tooltip, _load_shortcuts_dict  # noqa: E402
+from .ui_utils import create_icon, flash_button  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-# Path to material icons
-def get_icons_dir():
-    # Check Flatpak path first
-    flatpak_path = "/app/share/io.github.erenseymen.android-tv-remote/icons/material"
-    if os.path.exists(flatpak_path):
-        return flatpak_path
-    # Fallback to local development path
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/icons/material"))
-
-ICONS_DIR = get_icons_dir()
 
 # CSS for compact button layout
 BUTTON_CSS = """
@@ -266,23 +255,6 @@ class TvRemoteDialog(Adw.Window):
         
         threading.Thread(target=worker, name="tv-input", daemon=True).start()
 
-    def _send_back_command_to_tv(self) -> None:
-        """Send KEYCODE_BACK command to TV device."""
-        if not self._connected or not self._tv_client:
-            return
-        
-        # Store reference to client for thread safety
-        client = self._tv_client
-        
-        def worker():
-            try:
-                # Send Back keycode (4 is KEYCODE_BACK)
-                client.shell("input keyevent 4")
-            except Exception as e:
-                logger.error(f"Failed to send Back command to TV: {e}")
-        
-        threading.Thread(target=worker, name="tv-back", daemon=True).start()
-
     def _send_keycode_to_tv(self, keycode: str) -> None:
         """Send keycode to TV device."""
         if not self._connected or not self._tv_client:
@@ -317,15 +289,7 @@ class TvRemoteDialog(Adw.Window):
         btn = self._keycode_buttons.get(keycode)
         if not btn:
             return
-        # Add a CSS class for the "pressed" state
-        btn.add_css_class("suggested-action")
-
-        # Remove the class after a short delay
-        def remove_flash():
-            btn.remove_css_class("suggested-action")
-            return False  # Don't repeat
-
-        GLib.timeout_add(150, remove_flash)
+        flash_button(btn)
 
     def _build_ui(self) -> None:
         """Build the dialog UI."""
@@ -387,20 +351,8 @@ class TvRemoteDialog(Adw.Window):
         
         # Create icon or label
         if icon_name:
-            if icon_name.endswith(".svg"):
-                path = os.path.join(ICONS_DIR, icon_name)
-                if os.path.exists(path):
-                    file = Gio.File.new_for_path(path)
-                    gicon = Gio.FileIcon.new(file)
-                    image = Gtk.Image.new_from_gicon(gicon)
-                    image.set_pixel_size(40)
-                    btn.set_child(image)
-                else:
-                    btn.set_label(label)
-            else:
-                image = Gtk.Image.new_from_icon_name(icon_name)
-                image.set_pixel_size(40)
-                btn.set_child(image)
+            image = create_icon(icon_name, pixel_size=40)
+            btn.set_child(image)
         else:
             btn.set_label(label)
         

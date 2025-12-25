@@ -15,20 +15,9 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Adw", "1")
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
-import os
 
 from ..core.adb_client import DeviceInfo  # noqa: E402
-
-# Path to material icons
-def get_icons_dir():
-    # Check Flatpak path first
-    flatpak_path = "/app/share/io.github.erenseymen.android-tv-remote/icons/material"
-    if os.path.exists(flatpak_path):
-        return flatpak_path
-    # Fallback to local development path
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/icons/material"))
-
-ICONS_DIR = get_icons_dir()
+from .ui_utils import create_icon, flash_button  # noqa: E402
 
 
 # CSS for larger button fonts
@@ -68,8 +57,6 @@ KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_MEDIA_PLAY_PAUSE": "play-pause",
     "KEYCODE_MEDIA_PREVIOUS": "previous",
     "KEYCODE_MEDIA_NEXT": "next",
-    "KEYCODE_MEDIA_REWIND": "rewind",
-    "KEYCODE_MEDIA_FAST_FORWARD": "fast-forward",
     "KEYCODE_ALL_APPS": "apps",
     "KEYCODE_ASSIST": "assistant",
     "KEYCODE_CAPTIONS": "captions",
@@ -365,15 +352,7 @@ class RemotePanel(Gtk.Box):
         btn = self._keycode_buttons.get(keycode)
         if not btn:
             return
-        # Add a CSS class for the "pressed" state
-        btn.add_css_class("suggested-action")
-
-        # Remove the class after a short delay
-        def remove_flash():
-            btn.remove_css_class("suggested-action")
-            return False  # Don't repeat
-
-        GLib.timeout_add(150, remove_flash)
+        flash_button(btn)
 
     def _add_key_button(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
         # Create button
@@ -397,11 +376,11 @@ class RemotePanel(Gtk.Box):
                 icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
                 icon_box.set_halign(Gtk.Align.CENTER)
                 for name in icon_name:
-                    image = self._create_icon(name)
+                    image = create_icon(name)
                     icon_box.append(image)
                 box.append(icon_box)
             else:
-                image = self._create_icon(icon_name)
+                image = create_icon(icon_name)
                 box.append(image)
         else:
             main_label = Gtk.Label(label=label)
@@ -441,7 +420,7 @@ class RemotePanel(Gtk.Box):
         
         # Main content
         if icon_name:
-            image = self._create_icon(icon_name)
+            image = create_icon(icon_name)
             box.append(image)
         else:
             main_label = Gtk.Label(label="Find (YouTube)")
@@ -462,26 +441,6 @@ class RemotePanel(Gtk.Box):
         # Store references
         self._search_button = btn
         self._search_shortcut_label = shortcut_label
-
-    def _create_icon(self, icon_name: str) -> Gtk.Image:
-        """Create an icon from a file path or icon name.
-        
-        Uses Gio.FileIcon to load SVG files as symbolic icons,
-        which allows them to adapt their color to the current theme.
-        """
-        if icon_name.endswith(".svg"):
-            path = os.path.join(ICONS_DIR, icon_name)
-            if os.path.exists(path):
-                # Load as GIcon to get proper symbolic icon theming
-                file = Gio.File.new_for_path(path)
-                gicon = Gio.FileIcon.new(file)
-                image = Gtk.Image.new_from_gicon(gicon)
-                image.set_pixel_size(24)
-                return image
-        
-        image = Gtk.Image.new_from_icon_name(icon_name)
-        image.set_pixel_size(24)
-        return image
 
 
 
