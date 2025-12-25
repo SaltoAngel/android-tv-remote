@@ -518,7 +518,16 @@ class MainWindow(Adw.ApplicationWindow):
         """Send a key event to the device using scrcpy-server.
 
         Requires scrcpy-server connection for low-latency input (~35-70ms).
+        Special handling: If keycode is KEYCODE_TV_INPUT and TV IP is configured,
+        route the command to the TV instead of the current device.
         """
+        # Special handling for Input button: route to TV if configured
+        if keycode == "KEYCODE_TV_INPUT":
+            tv_ip = self._settings.get_string("tv-ip")
+            if tv_ip and tv_ip.strip():
+                self._send_tv_input_to_tv(tv_ip.strip())
+                return
+        
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
             self._toast("Device is not connected.")
@@ -545,6 +554,30 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             logger.error(f"scrcpy text input failed: {e}")
             self._toast("Failed to send text input to TV.")
+
+    def _send_tv_input_to_tv(self, tv_ip: str) -> None:
+        """Send KEYCODE_TV_INPUT command to the TV device.
+        
+        This is used when a TV IP is configured separately from the connected device
+        (e.g., when connected to Mi Box but want to control TV Input).
+        """
+        def worker():
+            try:
+                tv_client = AdbTcpClient(tv_ip, port=5555, timeout_s=3.0)
+                tv_client.connect()
+                # Send the Input keycode using ADB shell
+                tv_client.shell("input keyevent 178")  # 178 is KEYCODE_TV_INPUT
+                tv_client.disconnect()
+            except AdbAuthRequiredError:
+                GLib.idle_add(self._toast, f"TV {tv_ip} requires authorization. Please pair first.")
+            except AdbConnectError as e:
+                logger.warning(f"Failed to send Input to TV {tv_ip}: {e}")
+                GLib.idle_add(self._toast, f"Failed to connect to TV {tv_ip}")
+            except Exception as e:
+                logger.error(f"Error sending Input to TV {tv_ip}: {e}")
+                GLib.idle_add(self._toast, f"Error sending Input to TV")
+        
+        threading.Thread(target=worker, name="tv-input", daemon=True).start()
 
     def _paste_clipboard(self) -> None:
         """Read text from clipboard and send it to the device."""

@@ -316,6 +316,33 @@ class PreferencesDialog(Adw.Dialog):
         info_label.add_css_class("dim-label")
         content.append(info_label)
 
+        # TV IP Configuration Group
+        tv_ip_group = Adw.PreferencesGroup(title="TV Input Routing")
+        content.append(tv_ip_group)
+        
+        tv_ip_row = Adw.ActionRow(title="TV IP Address")
+        tv_ip_row.set_subtitle("Input button will be sent to this TV (leave empty to use current device)")
+        
+        tv_ip_entry = Gtk.Entry()
+        tv_ip_entry.set_placeholder_text("e.g. 192.168.1.100")
+        tv_ip_entry.set_input_purpose(Gtk.InputPurpose.URL)
+        tv_ip_entry.set_hexpand(True)
+        tv_ip_entry.set_valign(Gtk.Align.CENTER)
+        
+        # Load current TV IP from settings
+        current_tv_ip = self._settings.get_string("tv-ip")
+        if current_tv_ip:
+            tv_ip_entry.set_text(current_tv_ip)
+        
+        # Save TV IP when changed
+        def on_tv_ip_changed(entry):
+            ip = entry.get_text().strip()
+            self._settings.set_string("tv-ip", ip)
+        
+        tv_ip_entry.connect("changed", on_tv_ip_changed)
+        tv_ip_row.add_suffix(tv_ip_entry)
+        tv_ip_group.add(tv_ip_row)
+
         # Create preference groups for each category
         for category, actions in ACTION_CATEGORIES.items():
             group = Adw.PreferencesGroup(title=GLib.markup_escape_text(category))
