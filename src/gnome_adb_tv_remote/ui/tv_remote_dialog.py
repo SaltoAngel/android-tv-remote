@@ -95,28 +95,26 @@ class TvRemoteDialog(Adw.Window):
 
     def _on_close_request(self, *_args) -> bool:
         """Disconnect from TV and close the dialog."""
-        # Send Back command to TV before closing
-        self._send_back_command_to_tv()
-        self._disconnect_from_tv()
+        # Send Input command to TV before closing (to toggle input menu)
+        # Disconnect will happen after command is sent (via callback)
+        self._send_input_command_to_tv(on_complete=self._disconnect_from_tv)
         self.hide()
         return True
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle keyboard shortcuts for d-pad, Escape, and Back keys."""
-        # Escape or Q (Back shortcut) closes the dialog after sending Back command
+        # Escape closes the dialog (Input signal will be sent in _on_close_request)
         if keyval == Gdk.KEY_Escape:
-            self._send_back_command_to_tv()
             self.close()
             return True
         
-        # Check for Back key (Q)
+        # Check for Back key (Q) - closes the dialog (Input signal will be sent in _on_close_request)
         from .preferences_dialog import ACTION_TO_KEYCODE, gdk_name_to_keyval, _load_shortcuts_dict
         shortcuts = _load_shortcuts_dict(self._settings)
         back_keys = shortcuts.get("back", [])
         for key_name in back_keys:
             keyval_back = gdk_name_to_keyval(key_name)
             if keyval_back and (keyval == keyval_back or Gdk.keyval_to_lower(keyval) == keyval_back):
-                self._send_back_command_to_tv()
                 self.close()
                 return True
         
@@ -241,9 +239,15 @@ class TvRemoteDialog(Adw.Window):
             self._tv_client = None
         self._connected = False
 
-    def _send_input_command_to_tv(self) -> None:
-        """Send KEYCODE_TV_INPUT command to TV device."""
+    def _send_input_command_to_tv(self, on_complete: callable = None) -> None:
+        """Send KEYCODE_TV_INPUT command to TV device.
+        
+        Args:
+            on_complete: Optional callback to call when command is sent (or fails).
+        """
         if not self._connected or not self._tv_client:
+            if on_complete:
+                GLib.idle_add(on_complete)
             return
         
         # Store reference to client for thread safety
@@ -254,7 +258,11 @@ class TvRemoteDialog(Adw.Window):
                 # Send Input keycode (178 is KEYCODE_TV_INPUT)
                 client.shell("input keyevent 178")
             except Exception as e:
-                logger.error(f"Failed to send Input command to TV: {e}")
+                # Use debug level since errors during dialog close are expected
+                logger.debug(f"Failed to send Input command to TV: {e}")
+            finally:
+                if on_complete:
+                    GLib.idle_add(on_complete)
         
         threading.Thread(target=worker, name="tv-input", daemon=True).start()
 
