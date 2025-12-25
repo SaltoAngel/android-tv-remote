@@ -84,6 +84,7 @@ The application runs in a Flatpak sandbox and includes all dependencies. The bui
 ## Tested Devices
 
 - **Xiaomi TV Box S (2nd Gen)** - [Product page](https://www.epey.com/medya-oynatici/xiaomi-tv-box-s-2nd-gen.html)
+- **Philips 50PUS7000** - [Product page](https://www.epey.com/televizyon/philips-50pus7000.html)
 
 ## Project Structure
 
