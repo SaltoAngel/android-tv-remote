@@ -150,10 +150,8 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Mute", "KEYCODE_VOLUME_MUTE", 1, 4, icon_name="audio-volume-muted-symbolic")
         self._add_key_button("Vol+", "KEYCODE_VOLUME_UP", 2, 4, icon_name="audio-volume-high-symbolic")
 
-        # Media - Row 5: Rewind, Play/Pause, Fast Forward
-        self._add_key_button("Rewind", "KEYCODE_MEDIA_REWIND", 0, 5, icon_name="media-seek-backward-symbolic")
+        # Media - Row 5: Play/Pause
         self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
-        self._add_key_button("Fast Forward", "KEYCODE_MEDIA_FAST_FORWARD", 2, 5, icon_name="media-seek-forward-symbolic")
         
         # Media - Row 6: Prev, Stop (placeholder), Next
         self._add_key_button("Prev", "KEYCODE_MEDIA_PREVIOUS", 0, 6, icon_name="media-skip-backward-symbolic")
