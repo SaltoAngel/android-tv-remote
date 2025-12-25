@@ -10,6 +10,8 @@ finish-args:
   - --share=ipc
   - --socket=fallback-x11
   - --device=dri
+  # D-Bus access for MPRIS media player controls
+  - --own-name=org.mpris.MediaPlayer2.AndroidTVRemote
 
 build-options:
   env:

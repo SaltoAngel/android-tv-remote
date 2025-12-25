@@ -37,6 +37,7 @@ from .info_dialog import InfoDialog  # noqa: E402
 from .app_launcher_dialog import AppLauncherDialog  # noqa: E402
 from .app_switcher_dialog import AppSwitcherDialog  # noqa: E402
 from .tv_remote_dialog import TvRemoteDialog  # noqa: E402
+from ..core.mpris_service import MprisService  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,20 @@ class MainWindow(Adw.ApplicationWindow):
         self._tv_remote_dialog: TvRemoteDialog | None = None
         self._tv_device_info: DeviceInfo | None = None
         self._tv_scrcpy_required: bool = False  # True when TV scrcpy is needed but not yet connected
+        
+        # Initialize MPRIS service for desktop media control integration
+        self._mpris = MprisService(
+            on_play_pause=self._on_mpris_play_pause,
+            on_play=self._on_mpris_play,
+            on_pause=self._on_mpris_pause,
+            on_stop=self._on_mpris_stop,
+            on_next=self._on_mpris_next,
+            on_previous=self._on_mpris_previous,
+            on_raise=self._on_mpris_raise,
+            on_quit=self._on_mpris_quit,
+        )
+        self._mpris.start()
+        self._mpris_poll_timer_id: int = 0  # Timer ID for media info polling
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erenseymen.android-tv-remote")
@@ -121,6 +136,10 @@ class MainWindow(Adw.ApplicationWindow):
             self._settings.set_int("window-height", height)
 
         self._settings.set_boolean("window-is-maximized", is_maximized)
+        
+        # Stop MPRIS media polling and service
+        self._stop_mpris_media_polling()
+        self._mpris.stop()
 
         return False  # allow closing
 
@@ -433,6 +452,19 @@ class MainWindow(Adw.ApplicationWindow):
         # Enable buttons when scrcpy is ready
         if self._connected_ip:
             self._remote_panel.set_sensitive(True)
+            # Update MPRIS with device connection (get device name if available)
+            device_name = "Android TV"
+            if self._adb:
+                try:
+                    device_info = self._adb.get_device_info()
+                    if device_info and device_info.model:
+                        device_name = device_info.model
+                except Exception:
+                    pass
+            self._mpris.set_device_connected(True, device_name)
+            
+            # Start MPRIS media info polling (every 3 seconds)
+            self._start_mpris_media_polling()
         self._remote_panel.set_connection_status(None)  # Hide status on success
         logger.info("scrcpy-server connected - low-latency input enabled (no window)")
         
@@ -473,6 +505,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._connect_thread:
             self._toast("Still connecting…")
             return
+        # Stop MPRIS media polling
+        self._stop_mpris_media_polling()
         # Disconnect scrcpy first
         if self._scrcpy:
             try:
@@ -501,6 +535,8 @@ class MainWindow(Adw.ApplicationWindow):
                 pass
             self._adb = None
         self._set_connected(False)
+        # Update MPRIS to reflect disconnection
+        self._mpris.set_device_connected(False)
         self._toast("Disconnected from device.")
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
@@ -676,6 +712,10 @@ class MainWindow(Adw.ApplicationWindow):
         """Called when volume level is fetched from device."""
         self._current_volume = current
         self._remote_panel.update_volume(current, max_vol, is_muted)
+        # Update MPRIS volume (0.0 to 1.0 range)
+        if max_vol > 0:
+            mpris_volume = current / max_vol
+            self._mpris.set_volume(mpris_volume)
 
     def _on_volume_change(self, new_volume: int) -> None:
         """Handle volume slider change.
@@ -776,3 +816,145 @@ class MainWindow(Adw.ApplicationWindow):
             self._tv_scrcpy_required = False
             self._remote_panel.set_input_button_sensitive(True)
             logger.info("TV IP cleared or same as connected device - TV scrcpy disabled")
+
+    # -------------------------------------------------------------------------
+    # MPRIS Callbacks - Desktop media control integration
+    # -------------------------------------------------------------------------
+    
+    def _on_mpris_play_pause(self) -> None:
+        """Handle MPRIS PlayPause command - toggle play/pause on the TV."""
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_keycode("KEYCODE_MEDIA_PLAY_PAUSE")
+                self._remote_panel.flash_button("KEYCODE_MEDIA_PLAY_PAUSE")
+            except Exception as e:
+                logger.error(f"MPRIS PlayPause failed: {e}")
+    
+    def _on_mpris_play(self) -> None:
+        """Handle MPRIS Play command - start playback on the TV."""
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_keycode("KEYCODE_MEDIA_PLAY")
+                self._remote_panel.flash_button("KEYCODE_MEDIA_PLAY_PAUSE")
+            except Exception as e:
+                logger.error(f"MPRIS Play failed: {e}")
+    
+    def _on_mpris_pause(self) -> None:
+        """Handle MPRIS Pause command - pause playback on the TV."""
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_keycode("KEYCODE_MEDIA_PAUSE")
+                self._remote_panel.flash_button("KEYCODE_MEDIA_PLAY_PAUSE")
+            except Exception as e:
+                logger.error(f"MPRIS Pause failed: {e}")
+    
+    def _on_mpris_stop(self) -> None:
+        """Handle MPRIS Stop command - stop playback on the TV."""
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_keycode("KEYCODE_MEDIA_STOP")
+                self._remote_panel.flash_button("KEYCODE_MEDIA_STOP")
+            except Exception as e:
+                logger.error(f"MPRIS Stop failed: {e}")
+    
+    def _on_mpris_next(self) -> None:
+        """Handle MPRIS Next command - skip to next track on the TV."""
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_keycode("KEYCODE_MEDIA_NEXT")
+                self._remote_panel.flash_button("KEYCODE_MEDIA_NEXT")
+            except Exception as e:
+                logger.error(f"MPRIS Next failed: {e}")
+    
+    def _on_mpris_previous(self) -> None:
+        """Handle MPRIS Previous command - skip to previous track on the TV."""
+        scrcpy = self._scrcpy
+        if scrcpy and scrcpy.connected:
+            try:
+                scrcpy.send_keycode("KEYCODE_MEDIA_PREVIOUS")
+                self._remote_panel.flash_button("KEYCODE_MEDIA_PREVIOUS")
+            except Exception as e:
+                logger.error(f"MPRIS Previous failed: {e}")
+    
+    def _on_mpris_raise(self) -> None:
+        """Handle MPRIS Raise command - bring window to front."""
+        self.present()
+    
+    def _on_mpris_quit(self) -> None:
+        """Handle MPRIS Quit command - close the application."""
+        self.get_application().quit()
+
+    # -------------------------------------------------------------------------
+    # MPRIS Media Info Polling
+    # -------------------------------------------------------------------------
+    
+    def _start_mpris_media_polling(self) -> None:
+        """Start periodic polling for media session info."""
+        if self._mpris_poll_timer_id != 0:
+            return  # Already polling
+        
+        # Poll immediately, then every 3 seconds
+        self._poll_media_info()
+        self._mpris_poll_timer_id = GLib.timeout_add_seconds(3, self._poll_media_info)
+    
+    def _stop_mpris_media_polling(self) -> None:
+        """Stop periodic polling for media session info."""
+        if self._mpris_poll_timer_id != 0:
+            GLib.source_remove(self._mpris_poll_timer_id)
+            self._mpris_poll_timer_id = 0
+    
+    def _poll_media_info(self) -> bool:
+        """Fetch media info from device and update MPRIS.
+        
+        Returns True to continue polling, False to stop.
+        """
+        if not self._adb or not self._adb.connected:
+            self._stop_mpris_media_polling()
+            return False
+        
+        def worker():
+            try:
+                media_info = self._adb.get_media_session_info()
+                GLib.idle_add(self._on_media_info_fetched, media_info)
+            except Exception as e:
+                logger.debug(f"Failed to fetch media info: {e}")
+        
+        threading.Thread(target=worker, daemon=True).start()
+        return True  # Continue polling
+    
+    def _on_media_info_fetched(self, media_info) -> None:
+        """Called when media info is fetched from device."""
+        if media_info:
+            self._mpris.set_media_info(
+                title=media_info.title,
+                artist=media_info.artist,
+                album=media_info.album,
+                playback_status=media_info.playback_state,
+                position_ms=media_info.position_ms,
+            )
+            # Update RemotePanel's Now Playing widget
+            self._remote_panel.update_now_playing(
+                title=media_info.title,
+                artist=media_info.artist,
+                playback_status=media_info.playback_state,
+            )
+        else:
+            # No active media session - set to stopped with device name
+            self._mpris.set_media_info(
+                title=None,
+                artist=None,
+                album=None,
+                playback_status="Stopped",
+                position_ms=0,
+            )
+            # Hide the Now Playing widget
+            self._remote_panel.update_now_playing(
+                title=None,
+                artist=None,
+                playback_status="Stopped",
+            )

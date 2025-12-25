@@ -62,6 +62,32 @@ button.remote-button label.caption {
     min-height: 40px;
     padding: 8px;
 }
+
+.now-playing-box {
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 12px;
+    background: alpha(@accent_bg_color, 0.15);
+}
+
+.now-playing-box:backdrop {
+    background: alpha(@window_bg_color, 0.3);
+}
+
+.now-playing-title {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.now-playing-artist {
+    opacity: 0.8;
+    font-size: 0.95em;
+}
+
+.now-playing-status {
+    opacity: 0.6;
+    font-size: 0.85em;
+}
 """
 
 
@@ -125,6 +151,40 @@ class RemotePanel(Gtk.Box):
         
         self._status_box.set_visible(False)
         self.append(self._status_box)
+        
+        # Now Playing widget
+        self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self._now_playing_box.add_css_class("now-playing-box")
+        self._now_playing_box.set_halign(Gtk.Align.CENTER)
+        self._now_playing_box.set_margin_top(4)
+        self._now_playing_box.set_margin_bottom(4)
+        
+        # Playing icon
+        self._now_playing_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        self._now_playing_icon.set_pixel_size(24)
+        self._now_playing_box.append(self._now_playing_icon)
+        
+        # Text container
+        text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        text_box.set_valign(Gtk.Align.CENTER)
+        
+        self._now_playing_title = Gtk.Label(label="")
+        self._now_playing_title.add_css_class("now-playing-title")
+        self._now_playing_title.set_halign(Gtk.Align.START)
+        self._now_playing_title.set_ellipsize(3)  # Pango.EllipsizeMode.END
+        self._now_playing_title.set_max_width_chars(35)
+        text_box.append(self._now_playing_title)
+        
+        self._now_playing_artist = Gtk.Label(label="")
+        self._now_playing_artist.add_css_class("now-playing-artist")
+        self._now_playing_artist.set_halign(Gtk.Align.START)
+        self._now_playing_artist.set_ellipsize(3)  # Pango.EllipsizeMode.END
+        self._now_playing_artist.set_max_width_chars(35)
+        text_box.append(self._now_playing_artist)
+        
+        self._now_playing_box.append(text_box)
+        self._now_playing_box.set_visible(False)  # Hidden until media is playing
+        self.append(self._now_playing_box)
 
         self._grid = Gtk.Grid(column_spacing=10, row_spacing=10)
         self._grid.set_column_homogeneous(True)
@@ -573,3 +633,46 @@ class RemotePanel(Gtk.Box):
         btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
         if btn:
             btn.set_sensitive(sensitive)
+
+    def update_now_playing(
+        self,
+        title: str | None = None,
+        artist: str | None = None,
+        playback_status: str = "Stopped",
+    ) -> None:
+        """Update the Now Playing widget.
+        
+        Args:
+            title: Track/video title.
+            artist: Artist/channel name.
+            playback_status: One of "Playing", "Paused", "Stopped".
+        """
+        if not title or playback_status == "Stopped":
+            self._now_playing_box.set_visible(False)
+            return
+        
+        # Update title
+        self._now_playing_title.set_label(title or "")
+        
+        # Update artist
+        if artist:
+            self._now_playing_artist.set_label(artist)
+            self._now_playing_artist.set_visible(True)
+        else:
+            self._now_playing_artist.set_visible(False)
+        
+        # Update icon based on playback status
+        if playback_status == "Playing":
+            self._now_playing_icon.set_from_icon_name("media-playback-start-symbolic")
+        elif playback_status == "Paused":
+            self._now_playing_icon.set_from_icon_name("media-playback-pause-symbolic")
+        else:
+            self._now_playing_icon.set_from_icon_name("media-playback-stop-symbolic")
+        
+        # Set tooltip with full info (shown on hover)
+        tooltip = title
+        if artist:
+            tooltip += f"\n{artist}"
+        self._now_playing_box.set_tooltip_text(tooltip)
+        
+        self._now_playing_box.set_visible(True)

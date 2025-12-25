@@ -28,6 +28,7 @@ A GTK-based remote control application for Android TV devices, powered by [scrcp
 - **Keyboard Shortcuts**: Control your TV with keyboard shortcuts (all configurable)
 - **Text Input**: Type text directly to your TV for search and input fields
 - **Low-Latency Input**: Uses scrcpy-server technology for fast input response (~35-70ms)
+- **MPRIS Integration**: Control your TV's media playback from desktop media controls (GNOME Shell, KDE Plasma, etc.)
 
 ## Keyboard Shortcuts
 
@@ -96,7 +97,8 @@ android-tv-remote/
 │   │   ├── keystore.py        # RSA key generation
 │   │   ├── network_info.py    # Network interface discovery
 │   │   ├── scanner.py         # Subnet scanning
-│   │   └── scrcpy_controller.py  # Low-latency input via scrcpy-server
+│   │   ├── scrcpy_controller.py  # Low-latency input via scrcpy-server
+│   │   └── mpris_service.py   # MPRIS D-Bus integration for desktop media controls
 │   ├── ui/                 # User interface
 │   │   ├── main_window.py     # Main application window
 │   │   ├── device_dialog.py   # Device discovery dialog

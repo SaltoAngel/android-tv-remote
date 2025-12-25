@@ -58,6 +58,18 @@ class DeviceStatus:
     storage_total_gb: float
 
 
+@dataclass(frozen=True)
+class MediaInfo:
+    """Information about the currently playing media."""
+    title: str | None  # Track/video title
+    artist: str | None  # Artist/channel name
+    album: str | None  # Album name (if available)
+    package_name: str | None  # App playing the media
+    playback_state: str  # "Playing", "Paused", or "Stopped"
+    position_ms: int  # Current playback position in milliseconds
+    duration_ms: int  # Total duration in milliseconds (0 if unknown)
+
+
 class AdbTcpClient:
     def __init__(self, host: str, *, port: int = 5555, timeout_s: float = 8.0) -> None:
         self._host = host
@@ -402,6 +414,93 @@ class AdbTcpClient:
             current = stream_volume
         
         return (current, max_vol, is_muted)
+
+    def get_media_session_info(self) -> MediaInfo | None:
+        """Get information about the currently playing media.
+
+        Parses dumpsys media_session to extract playback state and metadata.
+
+        Returns:
+            MediaInfo if media is playing, None if no active session.
+        """
+        result = self.shell("dumpsys media_session")
+        
+        # Initialize values
+        package_name: str | None = None
+        playback_state = "Stopped"
+        position_ms = 0
+        title: str | None = None
+        artist: str | None = None
+        album: str | None = None
+        active_session = False
+        
+        for line in result.stdout.split('\n'):
+            line = line.strip()
+            
+            # Find active session package
+            # Format: starboard com.google.android.youtube.tv/starboard (userId=0)
+            if 'active=true' in line:
+                active_session = True
+            
+            # Package name is on the session line
+            if '/starboard' in line or ('package=' in line):
+                # Try to extract package from "package=com.xxx"
+                pkg_match = re.search(r'package=([^\s]+)', line)
+                if pkg_match:
+                    package_name = pkg_match.group(1)
+                else:
+                    # Try format: com.package.name/activityName
+                    pkg_match = re.search(r'\s([a-z][a-z0-9_.]+)/', line)
+                    if pkg_match:
+                        package_name = pkg_match.group(1)
+            
+            # Parse playback state
+            # Format: state=PlaybackState {state=3, position=29480, ...}
+            if 'state=PlaybackState' in line:
+                # state: 0=None, 1=Stopped, 2=Paused, 3=Playing, 4=FastForward, 5=Rewind
+                state_match = re.search(r'state=(\d+)', line.split('PlaybackState')[1])
+                if state_match:
+                    state_code = int(state_match.group(1))
+                    if state_code == 3:
+                        playback_state = "Playing"
+                    elif state_code == 2:
+                        playback_state = "Paused"
+                    else:
+                        playback_state = "Stopped"
+                
+                # Parse position
+                pos_match = re.search(r'position=(\d+)', line)
+                if pos_match:
+                    position_ms = int(pos_match.group(1))
+            
+            # Parse metadata
+            # Format: metadata: size=5, description=Title, Artist, Album
+            if 'metadata:' in line and 'description=' in line:
+                desc_match = re.search(r'description=(.+)$', line)
+                if desc_match:
+                    description = desc_match.group(1)
+                    # Split by comma - format is "Title, Artist, Album" or "Title, Artist, null"
+                    parts = [p.strip() for p in description.split(',')]
+                    if len(parts) >= 1 and parts[0] and parts[0].lower() != 'null':
+                        title = parts[0]
+                    if len(parts) >= 2 and parts[1] and parts[1].lower() != 'null':
+                        artist = parts[1]
+                    if len(parts) >= 3 and parts[2] and parts[2].lower() != 'null':
+                        album = parts[2]
+        
+        # Return None if no active media session
+        if not active_session or playback_state == "Stopped":
+            return None
+        
+        return MediaInfo(
+            title=title,
+            artist=artist,
+            album=album,
+            package_name=package_name,
+            playback_state=playback_state,
+            position_ms=position_ms,
+            duration_ms=0,  # Duration not available in dumpsys output
+        )
 
     def get_device_status(self) -> DeviceStatus:
         """Get comprehensive device status in a single call.

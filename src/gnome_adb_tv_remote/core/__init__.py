@@ -1,6 +1,6 @@
 """Core functionality for TV Remote."""
 
-from .adb_client import AdbTcpClient, AdbAuthRequiredError, AdbConnectError, DeviceInfo, AppInfo
+from .adb_client import AdbTcpClient, AdbAuthRequiredError, AdbConnectError, DeviceInfo, AppInfo, MediaInfo
 from .scrcpy_controller import (
     ScrcpyServerController,
     ScrcpyError,
@@ -13,6 +13,7 @@ from .icon_cache import (
     cache_icon,
     fetch_and_cache_icon,
 )
+from .mpris_service import MprisService
 
 __all__ = [
     "AdbTcpClient",
@@ -20,6 +21,7 @@ __all__ = [
     "AdbConnectError",
     "DeviceInfo",
     "AppInfo",
+    "MediaInfo",
     "ScrcpyServerController",
     "ScrcpyError",
     "ScrcpyConnectionError",
@@ -28,4 +30,5 @@ __all__ = [
     "get_cached_icon",
     "cache_icon",
     "fetch_and_cache_icon",
+    "MprisService",
 ]
