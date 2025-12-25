@@ -20,6 +20,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from .preferences_dialog import get_action_tooltip, _load_shortcuts_dict  # noqa: E402
 from .ui_utils import create_icon, flash_button  # noqa: E402
+from ..core.adb_client import DeviceInfo  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ DPAD_KEYCODES = {
 class TvRemoteDialog(Adw.Window):
     """Modal dialog for controlling external TV device with d-pad via scrcpy."""
 
-    def __init__(self, parent: Gtk.Window, tv_ip: str, settings: Gio.Settings, tv_scrcpy=None) -> None:
+    def __init__(self, parent: Gtk.Window, tv_ip: str, settings: Gio.Settings, tv_scrcpy=None, tv_device_info: DeviceInfo | None = None) -> None:
         super().__init__(
             transient_for=parent,
             modal=True,
@@ -61,6 +62,7 @@ class TvRemoteDialog(Adw.Window):
         self._tv_ip = tv_ip
         self._settings = settings
         self._tv_scrcpy = tv_scrcpy  # ScrcpyServerController for fast commands
+        self._tv_device_info = tv_device_info  # Device info for display
         self._key_map: dict[int, str] = {}
         self._title_widget: Adw.WindowTitle | None = None
         
@@ -211,7 +213,12 @@ class TvRemoteDialog(Adw.Window):
         self.set_content(toolbar_view)
 
         header = Adw.HeaderBar()
-        self._title_widget = Adw.WindowTitle(title="TV Remote", subtitle=self._tv_ip)
+        # Show manufacturer + model if available, otherwise show IP
+        if self._tv_device_info:
+            subtitle = f"{self._tv_device_info.manufacturer} {self._tv_device_info.model}"
+        else:
+            subtitle = self._tv_ip
+        self._title_widget = Adw.WindowTitle(title="TV Remote", subtitle=subtitle)
         header.set_title_widget(self._title_widget)
         toolbar_view.add_top_bar(header)
 

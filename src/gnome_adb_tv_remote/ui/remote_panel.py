@@ -564,3 +564,12 @@ class RemotePanel(Gtk.Box):
         # Send the keyevent to device
         if self._on_keyevent:
             self._on_keyevent("KEYCODE_VOLUME_MUTE")
+
+    def set_input_button_sensitive(self, sensitive: bool) -> None:
+        """Enable or disable the Input button.
+        
+        This is used to disable the button while TV scrcpy connection is being established.
+        """
+        btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
+        if btn:
+            btn.set_sensitive(sensitive)

@@ -69,6 +69,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._app_launcher_dialog: AppLauncherDialog | None = None
         self._app_switcher_dialog: AppSwitcherDialog | None = None
         self._tv_remote_dialog: TvRemoteDialog | None = None
+        self._tv_device_info: DeviceInfo | None = None
+        self._tv_scrcpy_required: bool = False  # True when TV scrcpy is needed but not yet connected
 
         # Initialize GSettings
         self._settings = Gio.Settings.new("io.github.erenseymen.android-tv-remote")
@@ -104,6 +106,9 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Load last connected IP and auto-connect
         self._auto_connect_last_ip()
+        
+        # Listen for TV IP setting changes
+        self._settings.connect("changed::tv-ip", self._on_tv_ip_setting_changed)
 
     def _on_close_request(self, *_args) -> bool:
         """Save window state before closing."""
@@ -435,9 +440,15 @@ class MainWindow(Adw.ApplicationWindow):
         self._update_volume_slider()
         
         # Start secondary scrcpy connection for TV Input Routing if configured
+        # Skip if TV IP is the same as connected device (no separate routing needed)
         tv_ip = self._settings.get_string("tv-ip")
-        if tv_ip and tv_ip.strip():
+        if tv_ip and tv_ip.strip() and tv_ip.strip() != self._connected_ip:
+            # Disable Input button until TV scrcpy connects
+            self._tv_scrcpy_required = True
+            self._remote_panel.set_input_button_sensitive(False)
             self._start_tv_scrcpy_async(tv_ip.strip())
+        else:
+            self._tv_scrcpy_required = False
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -542,7 +553,10 @@ class MainWindow(Adw.ApplicationWindow):
             return True
 
         # Handle TV Input shortcut (T key)
+        # Skip if TV scrcpy is required but not yet connected
         if keyval in (Gdk.KEY_t, Gdk.KEY_T):
+            if self._tv_scrcpy_required:
+                return True  # Ignore keypress while TV scrcpy is connecting
             self._remote_panel.flash_button("KEYCODE_TV_INPUT")
             self._on_remote_keyevent("KEYCODE_TV_INPUT")
             return True
@@ -568,9 +582,10 @@ class MainWindow(Adw.ApplicationWindow):
         send command directly to TV device for faster response.
         """
         # Special handling for Input button: open dialog (it will send Input command when connected)
+        # Skip TV routing if TV IP is the same as connected device
         if keycode == "KEYCODE_TV_INPUT":
             tv_ip = self._settings.get_string("tv-ip")
-            if tv_ip and tv_ip.strip():
+            if tv_ip and tv_ip.strip() and tv_ip.strip() != self._connected_ip:
                 # Open dialog - it will send Input command automatically when connected
                 self._open_tv_remote_dialog(tv_ip.strip())
                 return
@@ -622,7 +637,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._tv_remote_dialog = None
         
         # Always create a fresh dialog, passing TV scrcpy for fast commands
-        self._tv_remote_dialog = TvRemoteDialog(self, tv_ip, self._settings, self._tv_scrcpy)
+        self._tv_remote_dialog = TvRemoteDialog(self, tv_ip, self._settings, self._tv_scrcpy, self._tv_device_info)
         self._tv_remote_dialog.present()
 
     def _paste_clipboard(self) -> None:
@@ -694,23 +709,70 @@ class MainWindow(Adw.ApplicationWindow):
                 tv_client = AdbTcpClient(tv_ip, port=5555, timeout_s=8.0)
                 tv_client.connect()
                 
+                # Get device info for display in dialog
+                tv_device_info = tv_client.get_device_info()
+                
                 # Create scrcpy controller for TV
                 tv_scrcpy = ScrcpyServerController(tv_client)
                 tv_scrcpy.connect()
                 
-                GLib.idle_add(self._on_tv_scrcpy_connected, tv_client, tv_scrcpy)
+                GLib.idle_add(self._on_tv_scrcpy_connected, tv_client, tv_scrcpy, tv_device_info)
             except Exception as e:
                 logger.warning(f"TV scrcpy connection failed for {tv_ip}: {e}")
                 GLib.idle_add(self._on_tv_scrcpy_failed)
         
         threading.Thread(target=worker, name="tv-scrcpy-connect", daemon=True).start()
     
-    def _on_tv_scrcpy_connected(self, tv_adb: AdbTcpClient, tv_scrcpy: ScrcpyServerController) -> None:
+    def _on_tv_scrcpy_connected(self, tv_adb: AdbTcpClient, tv_scrcpy: ScrcpyServerController, tv_device_info: DeviceInfo) -> None:
         """Called when TV scrcpy connects successfully."""
         self._tv_adb = tv_adb
         self._tv_scrcpy = tv_scrcpy
-        logger.info(f"TV scrcpy connected to {tv_adb.host} - Input button will use fast connection")
+        self._tv_device_info = tv_device_info
+        self._tv_scrcpy_required = False  # Connection established
+        # Enable Input button now that TV scrcpy is ready
+        self._remote_panel.set_input_button_sensitive(True)
+        logger.info(f"TV scrcpy connected to {tv_adb.host} ({tv_device_info.model}) - Input button will use fast connection")
     
     def _on_tv_scrcpy_failed(self) -> None:
         """Called when TV scrcpy fails to connect."""
-        logger.info("TV scrcpy unavailable - Input button will use dialog method")
+        self._tv_scrcpy_required = False  # Give up on requirement
+        # Enable Input button - it will fall back to normal behavior (no TV routing)
+        self._remote_panel.set_input_button_sensitive(True)
+        logger.info("TV scrcpy unavailable - Input button will use normal mode")
+
+    def _on_tv_ip_setting_changed(self, settings: Gio.Settings, key: str) -> None:
+        """Called when TV IP setting changes - reconnect TV scrcpy if needed."""
+        # Only process if we have an active main connection
+        if not self._scrcpy or not self._scrcpy.connected:
+            return
+        
+        # Disconnect existing TV scrcpy
+        if self._tv_scrcpy:
+            try:
+                self._tv_scrcpy.disconnect()
+            except Exception:
+                pass
+            self._tv_scrcpy = None
+        if self._tv_adb:
+            try:
+                self._tv_adb.disconnect()
+            except Exception:
+                pass
+            self._tv_adb = None
+        self._tv_device_info = None
+        
+        # Get new TV IP
+        tv_ip = settings.get_string("tv-ip")
+        
+        # Start new connection if TV IP is set and different from connected device
+        if tv_ip and tv_ip.strip() and tv_ip.strip() != self._connected_ip:
+            # Disable Input button until TV scrcpy connects
+            self._tv_scrcpy_required = True
+            self._remote_panel.set_input_button_sensitive(False)
+            self._start_tv_scrcpy_async(tv_ip.strip())
+            logger.info(f"TV IP changed to {tv_ip} - reconnecting TV scrcpy")
+        else:
+            # No TV routing needed - enable Input button
+            self._tv_scrcpy_required = False
+            self._remote_panel.set_input_button_sensitive(True)
+            logger.info("TV IP cleared or same as connected device - TV scrcpy disabled")
