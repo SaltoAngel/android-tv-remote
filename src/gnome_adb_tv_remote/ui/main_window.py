@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 import gi
 
@@ -115,6 +116,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Track current volume for slider changes
         self._current_volume: int = 0
+        self._last_volume_change_time: float = 0.0
         self._remote_panel.update_tooltips(self._settings)
         # Update Power button tooltip
         self.reload_shortcuts()
@@ -726,6 +728,14 @@ class MainWindow(Adw.ApplicationWindow):
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
             return
+            
+        # Check if we should fetch the latest volume from the device
+        # We only do this if it's been a while since the last change (start of a sequence)
+        # to avoid jumping/lag while the user is actively sliding
+        now = time.time()
+        if now - self._last_volume_change_time > 2.0:  # 2 seconds threshold
+            self._update_volume_slider()
+        self._last_volume_change_time = now
         
         diff = new_volume - self._current_volume
         keycode = "KEYCODE_VOLUME_UP" if diff > 0 else "KEYCODE_VOLUME_DOWN"
