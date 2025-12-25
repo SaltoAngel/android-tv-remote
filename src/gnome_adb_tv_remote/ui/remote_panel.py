@@ -413,6 +413,7 @@ class RemotePanel(Gtk.Box):
         
         # Shortcut label (bold, same as Enter button)
         shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
         shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
         box.append(shortcut_label)
         
@@ -450,6 +451,7 @@ class RemotePanel(Gtk.Box):
         
         # Shortcut label (bold, same as Enter button)
         shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
         shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
         box.append(shortcut_label)
         

@@ -40,6 +40,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "apps": ["r"],
     "assistant": ["g"],
     "captions": ["c"],
+    "tv-input": ["t"],
     "focus-keyboard": ["k"],
     "search": ["f"],
 }
@@ -64,6 +65,7 @@ ACTION_TO_KEYCODE: dict[str, str] = {
     "apps": "KEYCODE_ALL_APPS",
     "assistant": "KEYCODE_ASSIST",
     "captions": "KEYCODE_CAPTIONS",
+    "tv-input": "KEYCODE_TV_INPUT",
     "focus-keyboard": None,  # Special action, not an ADB keycode
     "search": None,  # Special action, sends text "s" instead of keycode
 }
@@ -88,6 +90,7 @@ ACTION_LABELS: dict[str, str] = {
     "apps": "Apps",
     "assistant": "Google Assistant",
     "captions": "Captions/Subtitles",
+    "tv-input": "Input",
     "focus-keyboard": "Focus Keyboard",
     "search": "Find (YouTube)",
 }
@@ -98,7 +101,7 @@ ACTION_CATEGORIES: dict[str, list[str]] = {
     "System": ["back", "home", "menu", "apps", "assistant"],
     "Volume": ["volume-up", "volume-down", "volume-mute"],
     "Media": ["play-pause", "previous", "next"],
-    "TV Controls": ["power", "captions"],
+    "TV Controls": ["power", "captions", "tv-input"],
     "Other": ["focus-keyboard", "search"],
 }
 
