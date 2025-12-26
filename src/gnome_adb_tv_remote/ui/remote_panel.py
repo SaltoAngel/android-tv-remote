@@ -244,7 +244,7 @@ class RemotePanel(Gtk.Box):
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
         self._keyboard_entry.set_hexpand(True)
-        self._keyboard_entry.set_editable(False)  # Disable text input, we handle keys manually
+        self._keyboard_entry.set_editable(False)  # Read-only, but text is displayed and copyable
         self._keyboard_focused = False
         
         self._focus_keyboard_shortcut_text: str = "Tab"  # Default
@@ -375,6 +375,28 @@ class RemotePanel(Gtk.Box):
         """Called when keyboard input area loses focus."""
         self._keyboard_focused = False
         self._keyboard_entry.set_placeholder_text(f"Press {self._focus_keyboard_shortcut_text} to focus keyboard")
+        # Clear the displayed text when leaving focus
+        self._keyboard_entry.set_text("")
+
+    def _append_entry_text(self, char: str) -> None:
+        """Append a character to the entry text (read-only display)."""
+        current = self._keyboard_entry.get_text()
+        self._keyboard_entry.set_text(current + char)
+        # Move cursor to end
+        self._keyboard_entry.set_position(-1)
+
+    def append_text(self, text: str) -> None:
+        """Append text to the keyboard entry display (public method for paste)."""
+        current = self._keyboard_entry.get_text()
+        self._keyboard_entry.set_text(current + text)
+        self._keyboard_entry.set_position(-1)
+
+    def _delete_last_char(self) -> None:
+        """Delete the last character from entry text."""
+        current = self._keyboard_entry.get_text()
+        if current:
+            self._keyboard_entry.set_text(current[:-1])
+            self._keyboard_entry.set_position(-1)
 
     @property
     def keyboard_focused(self) -> bool:
@@ -397,6 +419,18 @@ class RemotePanel(Gtk.Box):
                 ok_btn.grab_focus()
             return True
         
+        # Arrow keys: send D-pad navigation commands
+        arrow_keymap = {
+            Gdk.KEY_Up: "KEYCODE_DPAD_UP",
+            Gdk.KEY_Down: "KEYCODE_DPAD_DOWN",
+            Gdk.KEY_Left: "KEYCODE_DPAD_LEFT",
+            Gdk.KEY_Right: "KEYCODE_DPAD_RIGHT",
+        }
+        if keyval in arrow_keymap:
+            if self._on_keyevent:
+                self._on_keyevent(arrow_keymap[keyval])
+            return True
+        
         # Enter: send KEYCODE_ENTER for text confirmation
         if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             if self._on_keyevent:
@@ -407,6 +441,8 @@ class RemotePanel(Gtk.Box):
         if keyval == Gdk.KEY_BackSpace:
             if self._on_keyevent:
                 self._on_keyevent("KEYCODE_DEL")
+            # Also delete from displayed text
+            self._delete_last_char()
             return True
         
         # Delete key: also send KEYCODE_DEL
@@ -432,6 +468,8 @@ class RemotePanel(Gtk.Box):
         if char and char.isprintable():
             if self._on_text:
                 self._on_text(char)
+            # Display the character in the entry
+            self._append_entry_text(char)
             return True
         
         return False

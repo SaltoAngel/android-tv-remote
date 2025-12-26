@@ -693,6 +693,8 @@ class MainWindow(Adw.ApplicationWindow):
             text = clipboard.read_text_finish(result)
             if text:
                 self._on_remote_text(text)
+                # Display pasted text in the keyboard entry
+                self._remote_panel.append_text(text)
         except Exception as e:
             logger.error(f"Failed to read clipboard: {e}")
 
