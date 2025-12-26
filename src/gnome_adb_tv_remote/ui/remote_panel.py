@@ -63,9 +63,32 @@ button.remote-button label.caption {
     padding: 6px;
 }
 
+.media-controls-section {
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 12px;
+    background: alpha(@accent_bg_color, 0.08);
+    border: 1px solid alpha(@accent_color, 0.2);
+}
+
+.media-controls-section:backdrop {
+    background: alpha(@window_bg_color, 0.15);
+    border-color: alpha(@borders, 0.3);
+}
+
+.media-buttons-row {
+    margin-bottom: 8px;
+}
+
+.media-buttons-row button {
+    min-width: 48px;
+    min-height: 40px;
+    padding: 8px 16px;
+}
+
 .now-playing-box {
     padding: 8px 12px;
-    margin: 6px 0;
+    margin-top: 8px;
     border-radius: 8px;
     background: alpha(@accent_bg_color, 0.15);
 }
@@ -160,40 +183,6 @@ class RemotePanel(Gtk.Box):
         self._status_box.set_visible(False)
         self.append(self._status_box)
         
-        # Now Playing widget
-        self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self._now_playing_box.add_css_class("now-playing-box")
-        self._now_playing_box.set_halign(Gtk.Align.CENTER)
-        self._now_playing_box.set_margin_top(2)
-        self._now_playing_box.set_margin_bottom(2)
-        
-        # Playing icon
-        self._now_playing_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-        self._now_playing_icon.set_pixel_size(24)
-        self._now_playing_box.append(self._now_playing_icon)
-        
-        # Text container
-        text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        text_box.set_valign(Gtk.Align.CENTER)
-        
-        self._now_playing_title = Gtk.Label(label="")
-        self._now_playing_title.add_css_class("now-playing-title")
-        self._now_playing_title.set_halign(Gtk.Align.START)
-        self._now_playing_title.set_ellipsize(3)  # Pango.EllipsizeMode.END
-        self._now_playing_title.set_max_width_chars(35)
-        text_box.append(self._now_playing_title)
-        
-        self._now_playing_artist = Gtk.Label(label="")
-        self._now_playing_artist.add_css_class("now-playing-artist")
-        self._now_playing_artist.set_halign(Gtk.Align.START)
-        self._now_playing_artist.set_ellipsize(3)  # Pango.EllipsizeMode.END
-        self._now_playing_artist.set_max_width_chars(35)
-        text_box.append(self._now_playing_artist)
-        
-        self._now_playing_box.append(text_box)
-        self._now_playing_box.set_visible(False)  # Hidden until media is playing
-        self.append(self._now_playing_box)
-
         self._grid = Gtk.Grid(column_spacing=6, row_spacing=6)
         self._grid.set_column_homogeneous(True)
         self._grid.set_row_homogeneous(True)
@@ -230,24 +219,17 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
         self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="view-list-symbolic")
 
-        # Volume slider row (spans all 3 columns)
-        self._add_volume_slider(row=4)
-
-        # Media - Row 5: Play/Pause
-        self._add_key_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", 1, 5, icon_name=["media-playback-start-symbolic", "media-playback-pause-symbolic"])
+        # System - Row 4: Apps, Search, Assistant
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 4, icon_name="view-app-grid-symbolic")
+        self._add_search_button(1, 4, icon_name="system-search-symbolic")
+        self._add_key_button("Assistant", "KEYCODE_ASSIST", 2, 4, icon_name="audio-input-microphone-symbolic")
         
-        # Media - Row 6: Prev, Stop (placeholder), Next
-        self._add_key_button("Prev", "KEYCODE_MEDIA_PREVIOUS", 0, 6, icon_name="media-skip-backward-symbolic")
-        self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 1, 6, icon_name="media-view-subtitles-symbolic")
-        self._add_key_button("Next", "KEYCODE_MEDIA_NEXT", 2, 6, icon_name="media-skip-forward-symbolic")
+        # Row 5: Subtitles, Input
+        self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 0, 5, icon_name="media-view-subtitles-symbolic")
+        self._add_key_button("Input", "KEYCODE_TV_INPUT", 2, 5, icon_name="video-display-symbolic")
         
-        # System - Row 7: Apps, Search, Assistant
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 7, icon_name="view-app-grid-symbolic")
-        self._add_search_button(1, 7, icon_name="system-search-symbolic")
-        self._add_key_button("Assistant", "KEYCODE_ASSIST", 2, 7, icon_name="audio-input-microphone-symbolic")
-        
-        # Row 8: Input (centered)
-        self._add_key_button("Input", "KEYCODE_TV_INPUT", 1, 8, icon_name="video-display-symbolic")
+        # Media Controls Section (above keyboard)
+        self._create_media_controls_section()
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -602,14 +584,35 @@ class RemotePanel(Gtk.Box):
         self._search_button = btn
         self._search_shortcut_label = shortcut_label
 
-    def _add_volume_slider(self, row: int) -> None:
-        """Add volume slider with mute button to the grid."""
-        # Create container box for the whole volume row
+    def _create_media_controls_section(self) -> None:
+        """Create the media controls section with playback buttons, volume, and now playing."""
+        # Main container for media controls section
+        section_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        section_box.add_css_class("media-controls-section")
+        
+        # Row 1: Media playback buttons (Prev, Play/Pause, Next)
+        media_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        media_row.add_css_class("media-buttons-row")
+        media_row.set_halign(Gtk.Align.CENTER)
+        
+        # Prev button
+        prev_btn = self._create_media_button("Prev", "KEYCODE_MEDIA_PREVIOUS", "media-skip-backward-symbolic")
+        media_row.append(prev_btn)
+        
+        # Play/Pause button
+        play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", ["media-playback-start-symbolic", "media-playback-pause-symbolic"])
+        media_row.append(play_btn)
+        
+        # Next button
+        next_btn = self._create_media_button("Next", "KEYCODE_MEDIA_NEXT", "media-skip-forward-symbolic")
+        media_row.append(next_btn)
+        
+        section_box.append(media_row)
+        
+        # Row 2: Volume slider with mute button
         volume_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         volume_box.add_css_class("volume-slider-box")
         volume_box.set_hexpand(True)
-        volume_box.set_vexpand(True)
-        volume_box.set_valign(Gtk.Align.CENTER)
         
         # Mute button
         mute_btn = Gtk.Button()
@@ -640,8 +643,65 @@ class RemotePanel(Gtk.Box):
         volume_box.append(slider)
         self._volume_slider = slider
         
-        # Attach to grid spanning all 3 columns
-        self._grid.attach(volume_box, 0, row, 3, 1)
+        section_box.append(volume_box)
+        
+        # Row 3: Now Playing widget
+        self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._now_playing_box.add_css_class("now-playing-box")
+        self._now_playing_box.set_halign(Gtk.Align.CENTER)
+        
+        # Playing icon
+        self._now_playing_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        self._now_playing_icon.set_pixel_size(24)
+        self._now_playing_box.append(self._now_playing_icon)
+        
+        # Text container
+        text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        text_box.set_valign(Gtk.Align.CENTER)
+        
+        self._now_playing_title = Gtk.Label(label="")
+        self._now_playing_title.add_css_class("now-playing-title")
+        self._now_playing_title.set_halign(Gtk.Align.START)
+        self._now_playing_title.set_ellipsize(3)  # Pango.EllipsizeMode.END
+        self._now_playing_title.set_max_width_chars(35)
+        text_box.append(self._now_playing_title)
+        
+        self._now_playing_artist = Gtk.Label(label="")
+        self._now_playing_artist.add_css_class("now-playing-artist")
+        self._now_playing_artist.set_halign(Gtk.Align.START)
+        self._now_playing_artist.set_ellipsize(3)  # Pango.EllipsizeMode.END
+        self._now_playing_artist.set_max_width_chars(35)
+        text_box.append(self._now_playing_artist)
+        
+        self._now_playing_box.append(text_box)
+        self._now_playing_box.set_visible(False)  # Hidden until media is playing
+        
+        section_box.append(self._now_playing_box)
+        
+        # Add section to main panel (before keyboard)
+        self.append(section_box)
+
+    def _create_media_button(self, label: str, keycode: str, icon_name: str | list[str]) -> Gtk.Button:
+        """Create a media control button."""
+        btn = Gtk.Button()
+        btn.set_tooltip_text(label)
+        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
+        
+        if isinstance(icon_name, list):
+            icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            icon_box.set_halign(Gtk.Align.CENTER)
+            for name in icon_name:
+                image = create_icon(name)
+                icon_box.append(image)
+            btn.set_child(icon_box)
+        else:
+            image = create_icon(icon_name)
+            btn.set_child(image)
+        
+        # Register button for flash feedback
+        self._keycode_buttons[keycode] = btn
+        
+        return btn
 
     def _on_slider_changed(self, slider: Gtk.Scale) -> None:
         """Called when slider value changes."""
