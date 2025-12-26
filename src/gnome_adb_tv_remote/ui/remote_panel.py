@@ -602,6 +602,12 @@ class RemotePanel(Gtk.Box):
         slider.set_draw_value(False)
         slider.set_tooltip_text("Volume")
         slider.connect("value-changed", self._on_slider_changed)
+        
+        # Add click gesture to allow clicking directly on the slider track
+        click_gesture = Gtk.GestureClick()
+        click_gesture.connect("released", self._on_slider_clicked)
+        slider.add_controller(click_gesture)
+        
         volume_box.append(slider)
         self._volume_slider = slider
         
@@ -623,6 +629,42 @@ class RemotePanel(Gtk.Box):
         # Notify callback
         if self._on_volume_change:
             self._on_volume_change(new_value)
+
+    def _on_slider_clicked(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """Handle click on slider to set value directly at click position."""
+        if not self._volume_slider:
+            return
+        
+        # Get slider dimensions
+        slider_width = self._volume_slider.get_width()
+        if slider_width <= 0:
+            return
+        
+        # Calculate the relative position (0.0 to 1.0)
+        # Account for some padding on the slider ends
+        padding = 12  # Approximate padding for the slider thumb area
+        effective_width = slider_width - (padding * 2)
+        if effective_width <= 0:
+            effective_width = slider_width
+        
+        # Clamp x to valid range
+        adjusted_x = max(0, min(x - padding, effective_width))
+        ratio = adjusted_x / effective_width
+        
+        # Calculate the new value based on the slider's range
+        adjustment = self._volume_slider.get_adjustment()
+        lower = adjustment.get_lower()
+        upper = adjustment.get_upper()
+        new_value = lower + (ratio * (upper - lower))
+        
+        # Round to nearest integer
+        new_value = round(new_value)
+        
+        # Clamp to valid range
+        new_value = max(int(lower), min(int(upper), int(new_value)))
+        
+        # Set the slider value (this will trigger _on_slider_changed)
+        self._volume_slider.set_value(new_value)
 
     def update_volume(self, current: int, max_vol: int, is_muted: bool = False) -> None:
         """Update volume slider from device state.

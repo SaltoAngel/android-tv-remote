@@ -714,6 +714,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_volume_fetched(self, current: int, max_vol: int, is_muted: bool) -> None:
         """Called when volume level is fetched from device."""
+        # Skip updating if user recently changed volume (within 1 second)
+        # This prevents the slider from jumping back to old values
+        if time.time() - self._last_volume_change_time < 1.0:
+            return
+        
         self._current_volume = current
         self._remote_panel.update_volume(current, max_vol, is_muted)
         # Update MPRIS volume (0.0 to 1.0 range)
@@ -730,16 +735,14 @@ class MainWindow(Adw.ApplicationWindow):
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
             return
-            
-        # Check if we should fetch the latest volume from the device
-        # We only do this if it's been a while since the last change (start of a sequence)
-        # to avoid jumping/lag while the user is actively sliding
-        now = time.time()
-        if now - self._last_volume_change_time > 2.0:  # 2 seconds threshold
-            self._update_volume_slider()
-        self._last_volume_change_time = now
+        
+        # Record the time of this volume change
+        self._last_volume_change_time = time.time()
         
         diff = new_volume - self._current_volume
+        if diff == 0:
+            return
+            
         keycode = "KEYCODE_VOLUME_UP" if diff > 0 else "KEYCODE_VOLUME_DOWN"
         
         try:
