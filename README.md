@@ -16,8 +16,6 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 | :---: | :---: |
 | ![Light Mode](screenshots/light.png) | ![Dark Mode](screenshots/dark.png) |
 
-[▶️ Watch Usage Demo](screenshots/usage.mp4)
-
 ## Features
 
 - **Auto-Connect**: Scans network for Android TVs (port 5555) and connects automatically.
