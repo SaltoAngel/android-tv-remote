@@ -103,6 +103,9 @@ class MainWindow(Adw.ApplicationWindow):
         width = self._settings.get_int("window-width")
         height = self._settings.get_int("window-height")
         self.set_default_size(width, height)
+        
+        # Set minimum window size to ensure all controls remain visible
+        self.set_size_request(350, 680)
         if self._settings.get_boolean("window-is-maximized"):
             self.maximize()
 

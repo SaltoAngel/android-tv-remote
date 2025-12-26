@@ -534,6 +534,10 @@ class RemotePanel(Gtk.Box):
         shortcut_label = Gtk.Label()
         shortcut_label.add_css_class("caption")
         shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
+        # Limit width and enable wrapping for long shortcuts (e.g. "Esc / Q / Backspace")
+        shortcut_label.set_max_width_chars(12)
+        shortcut_label.set_wrap(True)
+        shortcut_label.set_justify(Gtk.Justification.CENTER)
         box.append(shortcut_label)
         
         # Set box as button child
@@ -572,6 +576,10 @@ class RemotePanel(Gtk.Box):
         shortcut_label = Gtk.Label()
         shortcut_label.add_css_class("caption")
         shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
+        # Limit width and enable wrapping for long shortcuts
+        shortcut_label.set_max_width_chars(12)
+        shortcut_label.set_wrap(True)
+        shortcut_label.set_justify(Gtk.Justification.CENTER)
         box.append(shortcut_label)
         
         # Set box as button child
