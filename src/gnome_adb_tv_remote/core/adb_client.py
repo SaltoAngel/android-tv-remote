@@ -502,6 +502,83 @@ class AdbTcpClient:
             duration_ms=0,  # Duration not available in dumpsys output
         )
 
+    def has_tv_input_support(self) -> bool:
+        """Check if the device has hardware TV input support (HDMI, tuner, etc.).
+        
+        This determines whether the device is a real TV with input switching capability
+        versus a streaming box like Mi Box that doesn't have physical inputs.
+        
+        Returns:
+            True if device has hardware TV inputs, False otherwise.
+        """
+        try:
+            result = self.shell("dumpsys tv_input")
+            output = result.stdout
+            lines = output.split('\n')
+            
+            # Check for hardware input indicators in the output
+            # Real TVs have entries like:
+            # - org.droidtv.hdmiService
+            # - org.droidtv.tunerservice
+            # - mHardwareInputIdMap with INDENTED entries (not just the header)
+            # - HW\d+ patterns
+            
+            # Check for hardware input map entries
+            # The header looks like: "mHardwareInputIdMap: deviceId -> inputId"
+            # Real entries are INDENTED below and look like: "    1 -> org.droidtv..."
+            for i, line in enumerate(lines):
+                if "mHardwareInputIdMap:" in line:
+                    # Check if there are indented entries after the header
+                    for j in range(i + 1, min(i + 10, len(lines))):
+                        next_line = lines[j]
+                        # Stop if we hit the next section (mHdmiInputIdMap or mInputMap)
+                        if next_line.strip().startswith("mHdmi") or next_line.strip().startswith("mInputMap"):
+                            break
+                        # Check for indented entry with "->" (like "    1 -> org.droidtv...")
+                        # These entries start with whitespace (indented) and contain " -> "
+                        if next_line.startswith("    ") and " -> " in next_line:
+                            return True
+                    break
+            
+            # Check for mHdmiInputIdMap entries with actual device mappings
+            for i, line in enumerate(lines):
+                if "mHdmiInputIdMap:" in line:
+                    for j in range(i + 1, min(i + 10, len(lines))):
+                        next_line = lines[j]
+                        # Stop if we hit the next section
+                        if next_line.strip().startswith("mInputMap") or next_line.strip().startswith("mHardware"):
+                            break
+                        # Check for indented entry
+                        if next_line.startswith("    ") and " -> " in next_line:
+                            return True
+                    break
+            
+            # Alternative check: Look for hardware service packages
+            # These are specific to TVs with physical inputs
+            hardware_services = [
+                "org.droidtv.hdmiService",
+                "org.droidtv.tunerservice", 
+                "org.droidtv.scartService",
+                "org.droidtv.componentService",
+            ]
+            
+            for service in hardware_services:
+                if service in output:
+                    # Found a hardware input service - this is a real TV
+                    return True
+            
+            # Check for HW device entries (pattern like /HW9, /HW10)
+            # These indicate physical hardware inputs
+            import re
+            if re.search(r'/HW\d+', output):
+                return True
+            
+            return False
+            
+        except Exception:
+            # If we can't check, assume no support
+            return False
+
     def get_device_status(self) -> DeviceStatus:
         """Get comprehensive device status in a single call.
 

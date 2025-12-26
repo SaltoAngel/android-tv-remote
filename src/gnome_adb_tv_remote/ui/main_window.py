@@ -41,6 +41,7 @@ from .info_dialog import InfoDialog  # noqa: E402
 from .app_launcher_dialog import AppLauncherDialog  # noqa: E402
 from .app_switcher_dialog import AppSwitcherDialog  # noqa: E402
 from .tv_remote_dialog import TvRemoteDialog  # noqa: E402
+from .input_device_dialog import InputDeviceDialog  # noqa: E402
 from ..core.mpris_service import MprisService  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._tv_device_info: DeviceInfo | None = None
         self._tv_scrcpy_required: bool = False  # True when TV scrcpy is needed but not yet connected
         self._ip_discovery_in_progress: bool = False  # Flag to prevent reconnect loop during IP discovery
+        self._device_has_input_support: bool = True  # Whether connected device has native TV Input support
+        self._input_device_dialog: InputDeviceDialog | None = None
+        self._pending_tv_remote_dialog_ip: str | None = None  # IP to open TV remote dialog for after connection
         
         # Initialize MPRIS service for desktop media control integration
         self._mpris = MprisService(
@@ -710,6 +714,9 @@ class MainWindow(Adw.ApplicationWindow):
         # Fetch initial volume level
         self._update_volume_slider()
         
+        # Check if device supports TV Input in background
+        self._check_tv_input_support_async()
+        
         # Start secondary scrcpy connection for TV Input Routing if configured
         # Skip if TV IP is the same as connected device (no separate routing needed)
         tv_ip = self._settings.get_string("tv-ip")
@@ -720,6 +727,43 @@ class MainWindow(Adw.ApplicationWindow):
             self._start_tv_scrcpy_async(tv_ip.strip())
         else:
             self._tv_scrcpy_required = False
+
+    def _check_tv_input_support_async(self) -> None:
+        """Check if connected device has TV Input support in background thread."""
+        adb = self._adb
+        if not adb:
+            return
+        
+        def worker():
+            try:
+                has_support = adb.has_tv_input_support()
+                GLib.idle_add(self._on_tv_input_support_checked, has_support)
+            except Exception as e:
+                logger.debug(f"Failed to check TV Input support: {e}")
+                # Assume supported if check fails
+                GLib.idle_add(self._on_tv_input_support_checked, True)
+        
+        threading.Thread(target=worker, name="tv-input-check", daemon=True).start()
+
+    def _on_tv_input_support_checked(self, has_support: bool) -> bool:
+        """Called when TV Input support check completes.
+        
+        Args:
+            has_support: Whether the device has native TV Input support.
+            
+        Returns:
+            False for GLib.idle_add compatibility.
+        """
+        self._device_has_input_support = has_support
+        
+        if not has_support:
+            # Device doesn't support Input - dim the button
+            self._remote_panel.set_input_button_dimmed(True)
+            logger.info("Connected device doesn't support TV Input - button dimmed")
+        else:
+            self._remote_panel.set_input_button_dimmed(False)
+        
+        return False
 
     def _on_scrcpy_unavailable(self) -> None:
         """Called when scrcpy is not available."""
@@ -856,10 +900,16 @@ class MainWindow(Adw.ApplicationWindow):
         Special handling: If keycode is KEYCODE_TV_INPUT and TV scrcpy is connected,
         send command directly to TV device for faster response.
         """
-        # Special handling for Input button: open dialog (it will send Input command when connected)
-        # Skip TV routing if TV IP is the same as connected device
+        # Special handling for Input button
         if keycode == "KEYCODE_TV_INPUT":
             tv_ip = self._settings.get_string("tv-ip")
+            
+            # If device doesn't support Input and no TV IP configured, show device selection dialog
+            if not self._device_has_input_support and (not tv_ip or not tv_ip.strip() or tv_ip.strip() == self._connected_ip):
+                self._open_input_device_dialog()
+                return
+            
+            # If TV IP is configured and different from connected device, open TV remote dialog
             if tv_ip and tv_ip.strip() and tv_ip.strip() != self._connected_ip:
                 # Open dialog - it will send Input command automatically when connected
                 self._open_tv_remote_dialog(tv_ip.strip())
@@ -914,6 +964,37 @@ class MainWindow(Adw.ApplicationWindow):
         # Always create a fresh dialog, passing TV scrcpy for fast commands
         self._tv_remote_dialog = TvRemoteDialog(self, tv_ip, self._settings, self._tv_scrcpy, self._tv_device_info)
         self._tv_remote_dialog.present()
+
+    def _open_input_device_dialog(self) -> None:
+        """Open the Input Device Selection dialog.
+        
+        This is shown when the connected device doesn't support TV Input
+        and no alternative TV is configured. Allows user to select
+        a device with Input support from discovered devices.
+        """
+        # Close existing dialog if any
+        if self._input_device_dialog:
+            self._input_device_dialog.close()
+            self._input_device_dialog = None
+        
+        self._input_device_dialog = InputDeviceDialog(
+            settings=self._settings,
+            on_device_selected=self._on_input_device_selected,
+        )
+        self._input_device_dialog.present(self)
+
+    def _on_input_device_selected(self, ip: str) -> None:
+        """Called when user selects a device in the Input Device Selection dialog.
+        
+        Args:
+            ip: IP address of the selected device.
+        """
+        # Start TV scrcpy connection to selected device
+        self._tv_scrcpy_required = True
+        self._remote_panel.set_input_button_sensitive(False)
+        # Set flag to open TV remote dialog after connection
+        self._pending_tv_remote_dialog_ip = ip
+        self._start_tv_scrcpy_async(ip)
 
     def _paste_clipboard(self) -> None:
         """Read text from clipboard and send it to the device."""
@@ -1023,13 +1104,29 @@ class MainWindow(Adw.ApplicationWindow):
         self._tv_scrcpy_required = False  # Connection established
         # Enable Input button now that TV scrcpy is ready
         self._remote_panel.set_input_button_sensitive(True)
-        logger.info(f"TV scrcpy connected to {tv_adb.host} ({tv_device_info.model}) - Input button will use fast connection")
+        # Update tooltip to show connected TV device (manufacturer + model)
+        if tv_device_info and tv_device_info.manufacturer and tv_device_info.model:
+            device_name = f"{tv_device_info.manufacturer} {tv_device_info.model}"
+        elif tv_device_info and tv_device_info.model:
+            device_name = tv_device_info.model
+        else:
+            device_name = tv_adb.host
+        self._remote_panel.set_input_button_tooltip(f"Input ({device_name})")
+        logger.info(f"TV scrcpy connected to {tv_adb.host} ({device_name}) - Input button will use fast connection")
+        
+        # If we have a pending TV remote dialog to open, do it now
+        if self._pending_tv_remote_dialog_ip:
+            ip = self._pending_tv_remote_dialog_ip
+            self._pending_tv_remote_dialog_ip = None
+            self._open_tv_remote_dialog(ip)
     
     def _on_tv_scrcpy_failed(self) -> None:
         """Called when TV scrcpy fails to connect."""
         self._tv_scrcpy_required = False  # Give up on requirement
+        self._pending_tv_remote_dialog_ip = None  # Clear pending dialog
         # Enable Input button - it will fall back to normal behavior (no TV routing)
         self._remote_panel.set_input_button_sensitive(True)
+        self._remote_panel.set_input_button_tooltip("Input")
         logger.info("TV scrcpy unavailable - Input button will use normal mode")
 
     def _on_tv_ip_setting_changed(self, settings: Gio.Settings, key: str) -> None:

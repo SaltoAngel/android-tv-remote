@@ -88,6 +88,14 @@ button.remote-button label.caption {
     opacity: 0.6;
     font-size: 0.85em;
 }
+
+.input-button-dimmed {
+    opacity: 0.5;
+}
+
+.input-button-dimmed:hover {
+    opacity: 0.7;
+}
 """
 
 
@@ -738,6 +746,35 @@ class RemotePanel(Gtk.Box):
         btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
         if btn:
             btn.set_sensitive(sensitive)
+
+    def set_input_button_dimmed(self, dimmed: bool) -> None:
+        """Set the Input button to dimmed state (visible but indicates limited support).
+        
+        When dimmed, the button remains clickable but appears faded to indicate
+        that the connected device doesn't natively support Input switching.
+        Clicking it will show alternative device options.
+        
+        Args:
+            dimmed: If True, make the button appear faded.
+        """
+        btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
+        if btn:
+            if dimmed:
+                btn.add_css_class("input-button-dimmed")
+                btn.set_tooltip_text("Input (Select a device with TV inputs)")
+            else:
+                btn.remove_css_class("input-button-dimmed")
+                btn.set_tooltip_text("Input")
+
+    def set_input_button_tooltip(self, tooltip: str) -> None:
+        """Set custom tooltip for the Input button.
+        
+        Args:
+            tooltip: The tooltip text to display.
+        """
+        btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
+        if btn:
+            btn.set_tooltip_text(tooltip)
 
     def update_now_playing(
         self,
