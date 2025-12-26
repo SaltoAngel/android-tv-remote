@@ -20,12 +20,12 @@ from ..core.adb_client import DeviceInfo  # noqa: E402
 from .ui_utils import create_icon, flash_button  # noqa: E402
 
 
-# CSS for larger button fonts and volume slider
+# CSS for compact button fonts and volume slider
 BUTTON_CSS = """
 button.remote-button {
-    padding: 12px;
-    min-width: 80px;
-    min-height: 80px;
+    padding: 6px;
+    min-width: 48px;
+    min-height: 48px;
 }
 
 button.remote-button image {
@@ -36,37 +36,37 @@ button.remote-button label.caption {
     font-size: 0.8em;
     font-weight: 700;
     opacity: 0.9;
-    margin-top: 4px;
+    margin-top: 2px;
 }
 
 .volume-slider-box {
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-top: 4px;
+    margin-bottom: 4px;
 }
 
 .volume-slider-box scale {
-    min-height: 32px;
+    min-height: 24px;
 }
 
 .volume-slider-box scale trough {
-    min-height: 8px;
-    border-radius: 4px;
+    min-height: 6px;
+    border-radius: 3px;
 }
 
 .volume-slider-box scale highlight {
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 .volume-mute-button {
-    min-width: 40px;
-    min-height: 40px;
-    padding: 8px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 6px;
 }
 
 .now-playing-box {
-    padding: 12px 16px;
-    margin: 8px 0;
-    border-radius: 12px;
+    padding: 8px 12px;
+    margin: 6px 0;
+    border-radius: 8px;
     background: alpha(@accent_bg_color, 0.15);
 }
 
@@ -76,12 +76,12 @@ button.remote-button label.caption {
 
 .now-playing-title {
     font-weight: bold;
-    font-size: 1.1em;
+    font-size: 1.0em;
 }
 
 .now-playing-artist {
     opacity: 0.8;
-    font-size: 0.95em;
+    font-size: 0.9em;
 }
 
 .now-playing-status {
@@ -129,11 +129,11 @@ class RemotePanel(Gtk.Box):
     """
 
     def __init__(self) -> None:
-        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self.set_margin_top(18)
-        self.set_margin_bottom(18)
-        self.set_margin_start(18)
-        self.set_margin_end(18)
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.set_margin_top(8)
+        self.set_margin_bottom(8)
+        self.set_margin_start(8)
+        self.set_margin_end(8)
         
         # Apply CSS for larger button fonts
         css_provider = Gtk.CssProvider()
@@ -161,11 +161,11 @@ class RemotePanel(Gtk.Box):
         self.append(self._status_box)
         
         # Now Playing widget
-        self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._now_playing_box.add_css_class("now-playing-box")
         self._now_playing_box.set_halign(Gtk.Align.CENTER)
-        self._now_playing_box.set_margin_top(4)
-        self._now_playing_box.set_margin_bottom(4)
+        self._now_playing_box.set_margin_top(2)
+        self._now_playing_box.set_margin_bottom(2)
         
         # Playing icon
         self._now_playing_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
@@ -194,7 +194,7 @@ class RemotePanel(Gtk.Box):
         self._now_playing_box.set_visible(False)  # Hidden until media is playing
         self.append(self._now_playing_box)
 
-        self._grid = Gtk.Grid(column_spacing=10, row_spacing=10)
+        self._grid = Gtk.Grid(column_spacing=6, row_spacing=6)
         self._grid.set_column_homogeneous(True)
         self._grid.set_row_homogeneous(True)
         self.append(self._grid)
@@ -526,7 +526,7 @@ class RemotePanel(Gtk.Box):
         btn.set_vexpand(True)
         
         # Create vertical box for content and shortcut
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         box.set_valign(Gtk.Align.CENTER)
         box.set_halign(Gtk.Align.CENTER)
         
@@ -574,7 +574,7 @@ class RemotePanel(Gtk.Box):
         btn.connect("clicked", lambda *_: self._on_text and self._on_text("s"))
         
         # Create vertical box for label and shortcut
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         box.set_valign(Gtk.Align.CENTER)
         box.set_halign(Gtk.Align.CENTER)
         
