@@ -590,44 +590,25 @@ class RemotePanel(Gtk.Box):
         section_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         section_box.add_css_class("media-controls-section")
         
-        # Row 1: Media playback buttons (Prev, Play/Pause, Next)
-        media_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        media_row.add_css_class("media-buttons-row")
-        media_row.set_halign(Gtk.Align.CENTER)
+        # Single row: Media buttons (left) + Volume slider (center) + Mute button (right)
+        controls_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        controls_row.add_css_class("volume-slider-box")
+        controls_row.set_hexpand(True)
         
+        # Left side: Prev, Play/Pause, Next buttons
         # Prev button
         prev_btn = self._create_media_button("Prev", "KEYCODE_MEDIA_PREVIOUS", "media-skip-backward-symbolic")
-        media_row.append(prev_btn)
+        controls_row.append(prev_btn)
         
         # Play/Pause button
         play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", ["media-playback-start-symbolic", "media-playback-pause-symbolic"])
-        media_row.append(play_btn)
+        controls_row.append(play_btn)
         
         # Next button
         next_btn = self._create_media_button("Next", "KEYCODE_MEDIA_NEXT", "media-skip-forward-symbolic")
-        media_row.append(next_btn)
+        controls_row.append(next_btn)
         
-        section_box.append(media_row)
-        
-        # Row 2: Volume slider with mute button
-        volume_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        volume_box.add_css_class("volume-slider-box")
-        volume_box.set_hexpand(True)
-        
-        # Mute button
-        mute_btn = Gtk.Button()
-        mute_btn.add_css_class("volume-mute-button")
-        mute_btn.set_tooltip_text("Mute")
-        mute_btn.connect("clicked", self._on_mute_clicked)
-        
-        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
-        mute_icon.set_pixel_size(24)
-        mute_btn.set_child(mute_icon)
-        volume_box.append(mute_btn)
-        self._mute_button = mute_btn
-        self._keycode_buttons["KEYCODE_VOLUME_MUTE"] = mute_btn
-        
-        # Volume slider
+        # Center: Volume slider
         adjustment = Gtk.Adjustment(value=0, lower=0, upper=15, step_increment=1, page_increment=1)
         slider = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adjustment)
         slider.set_hexpand(True)
@@ -640,10 +621,23 @@ class RemotePanel(Gtk.Box):
         click_gesture.connect("released", self._on_slider_clicked)
         slider.add_controller(click_gesture)
         
-        volume_box.append(slider)
+        controls_row.append(slider)
         self._volume_slider = slider
         
-        section_box.append(volume_box)
+        # Right side: Mute button
+        mute_btn = Gtk.Button()
+        mute_btn.add_css_class("volume-mute-button")
+        mute_btn.set_tooltip_text("Mute")
+        mute_btn.connect("clicked", self._on_mute_clicked)
+        
+        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
+        mute_icon.set_pixel_size(24)
+        mute_btn.set_child(mute_icon)
+        controls_row.append(mute_btn)
+        self._mute_button = mute_btn
+        self._keycode_buttons["KEYCODE_VOLUME_MUTE"] = mute_btn
+        
+        section_box.append(controls_row)
         
         # Row 3: Now Playing widget
         self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
