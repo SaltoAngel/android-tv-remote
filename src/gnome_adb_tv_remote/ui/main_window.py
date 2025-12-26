@@ -8,6 +8,7 @@ input, and integrates with the scrcpy-server for low-latency input injection.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -21,6 +22,8 @@ gi.require_version("Gdk", "4.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..core.adb_client import AdbAuthRequiredError, AdbConnectError, AdbTcpClient, DeviceInfo  # noqa: E402
+from ..core.scanner import SubnetScanner, HostFound, ScanProgress  # noqa: E402
+from ..core.network_info import get_ipv4_interface_networks  # noqa: E402
 from ..core.scrcpy_controller import (  # noqa: E402
     ScrcpyServerController,
     ScrcpyConnectionError,
@@ -73,6 +76,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._tv_remote_dialog: TvRemoteDialog | None = None
         self._tv_device_info: DeviceInfo | None = None
         self._tv_scrcpy_required: bool = False  # True when TV scrcpy is needed but not yet connected
+        self._ip_discovery_in_progress: bool = False  # Flag to prevent reconnect loop during IP discovery
         
         # Initialize MPRIS service for desktop media control integration
         self._mpris = MprisService(
@@ -297,15 +301,248 @@ class MainWindow(Adw.ApplicationWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def _auto_connect_last_ip(self) -> None:
-        """Load the last successfully connected IP address from settings and auto-connect."""
+        """Load the last successfully connected IP address from settings and auto-connect.
+        
+        If connection fails, triggers network discovery to find paired devices
+        that may have changed IP addresses.
+        """
         last_ip = self._settings.get_string("last-connected-ip")
         if last_ip:
             # Automatically attempt connection after UI is fully initialized
-            GLib.idle_add(lambda: self._connect_ip(last_ip, silent=True))
+            GLib.idle_add(lambda: (self._connect_ip_with_discovery_fallback(last_ip), False)[1])
+    
+    def _connect_ip_with_discovery_fallback(self, ip: str) -> None:
+        """Attempt to connect to IP, falling back to IP discovery on failure.
+        
+        This is used for auto-connect on startup. If the saved IP is no longer
+        reachable, we scan the network to find paired devices that may have
+        changed IP addresses.
+        """
+        if not ip:
+            return
+        
+        if self._connect_thread:
+            return
+        
+        self._connect_silent = True
+        self._remote_panel.set_connection_status("Connecting…")
+        client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
+        
+        def worker() -> None:
+            try:
+                try:
+                    client.connect()
+                    device_info = client.get_device_info()
+                except (AdbAuthRequiredError, AdbConnectError, Exception):
+                    # Connection failed - start IP discovery in background
+                    GLib.idle_add(self._on_auto_connect_failed_start_discovery)
+                    return
+                
+                GLib.idle_add(self._on_connect_success_ui, ip, client, device_info)
+            finally:
+                GLib.idle_add(self._on_connect_done_ui)
+        
+        self._connect_thread = threading.Thread(target=worker, name="adb-auto-connect", daemon=True)
+        self._connect_thread.start()
+    
+    def _on_auto_connect_failed_start_discovery(self) -> None:
+        """Called when auto-connect fails. Starts network discovery to find paired devices."""
+        self._connect_thread = None
+        self._connect_silent = False
+        self._remote_panel.set_connection_status("Searching for device…")
+        logger.info("Auto-connect failed, starting network discovery for paired devices")
+        
+        # Start discovery in background thread
+        threading.Thread(
+            target=self._discover_and_update_device_ips,
+            name="ip-discovery",
+            daemon=True
+        ).start()
+    
+    def _discover_and_update_device_ips(self) -> None:
+        """Scan network for paired devices and update stored IPs.
+        
+        This runs in a background thread. It:
+        1. Scans for devices with ADB port open
+        2. Checks which ones are paired using is_paired_silent
+        3. Gets device info for paired devices
+        4. Matches device names with stored discovered-devices
+        5. Updates both last-connected-ip and tv-ip if their devices are found
+        6. Attempts to connect to the previously saved device
+        """
+        # Load stored device info
+        stored_devices_json = self._settings.get_string("discovered-devices")
+        stored_devices: list[dict] = []
+        try:
+            if stored_devices_json:
+                stored_devices = json.loads(stored_devices_json)
+        except Exception:
+            pass
+        
+        # Get last connected device's model (if we have it stored)
+        last_ip = self._settings.get_string("last-connected-ip")
+        last_device_model: str | None = None
+        for dev in stored_devices:
+            if dev.get("ip") == last_ip:
+                last_device_model = dev.get("model")
+                break
+        
+        # Get TV IP device's model (if we have it stored)
+        tv_ip = self._settings.get_string("tv-ip")
+        tv_device_model: str | None = None
+        if tv_ip:
+            for dev in stored_devices:
+                if dev.get("ip") == tv_ip:
+                    tv_device_model = dev.get("model")
+                    break
+        
+        # Get networks to scan
+        nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
+        if not nets:
+            GLib.idle_add(self._on_discovery_complete, None, None, "No networks found")
+            return
+        
+        # Scan for devices
+        scanner = SubnetScanner(port=5555, timeout_s=0.35, concurrency=256)
+        found_hosts: list[HostFound] = []
+        
+        def on_found(host: HostFound) -> None:
+            found_hosts.append(host)
+        
+        try:
+            scanner.scan(nets, on_found=on_found)
+        except Exception as e:
+            logger.error(f"Network scan failed: {e}")
+            GLib.idle_add(self._on_discovery_complete, None, None, "Scan failed")
+            return
+        
+        if not found_hosts:
+            GLib.idle_add(self._on_discovery_complete, None, None, "No devices found")
+            return
+        
+        # Check each found device for pairing status and get device info
+        paired_devices: list[dict] = []
+        new_ip_for_last_device: str | None = None
+        new_ip_for_tv_device: str | None = None
+        
+        for host in found_hosts:
+            ip = str(host.ip)
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
+                if not client.is_paired_silent():
+                    continue
+                
+                # Device is paired - get its info
+                try:
+                    client.connect()
+                    device_info = client.get_device_info()
+                    client.disconnect()
+                except Exception:
+                    device_info = None
+                
+                device_data = {
+                    "ip": ip,
+                    "latency_ms": host.latency_ms,
+                    "model": device_info.model if device_info else None,
+                    "version": device_info.version if device_info else None,
+                }
+                paired_devices.append(device_data)
+                
+                # Check if this matches our last connected device
+                if last_device_model and device_info and device_info.model == last_device_model:
+                    new_ip_for_last_device = ip
+                    logger.info(f"Found main device '{last_device_model}' at new IP: {ip}")
+                
+                # Check if this matches our TV device
+                if tv_device_model and device_info and device_info.model == tv_device_model:
+                    new_ip_for_tv_device = ip
+                    logger.info(f"Found TV device '{tv_device_model}' at new IP: {ip}")
+                
+            except Exception as e:
+                logger.debug(f"Failed to check device at {ip}: {e}")
+                continue
+        
+        # Update stored devices with new IP addresses
+        if paired_devices:
+            # Build a map of model -> new IP from paired devices
+            model_to_new_ip: dict[str, str] = {}
+            for pd in paired_devices:
+                if pd.get("model"):
+                    model_to_new_ip[pd["model"]] = pd["ip"]
+            
+            # Update stored devices
+            updated_devices: list[dict] = []
+            for stored_dev in stored_devices:
+                stored_model = stored_dev.get("model")
+                if stored_model and stored_model in model_to_new_ip:
+                    # Update IP
+                    stored_dev["ip"] = model_to_new_ip[stored_model]
+                    # Find latency from paired_devices
+                    for pd in paired_devices:
+                        if pd.get("model") == stored_model:
+                            stored_dev["latency_ms"] = pd.get("latency_ms", 0)
+                            break
+                updated_devices.append(stored_dev)
+            
+            # Also add any new paired devices not in stored list
+            stored_models = {d.get("model") for d in stored_devices if d.get("model")}
+            for pd in paired_devices:
+                if pd.get("model") and pd["model"] not in stored_models:
+                    updated_devices.append(pd)
+            
+            # Save updated devices - wrap in function that returns False to prevent GLib loop
+            def save_devices():
+                self._settings.set_string("discovered-devices", json.dumps(updated_devices))
+                return False
+            GLib.idle_add(save_devices)
+        
+        # Update TV IP if found at new address
+        # Set flag to prevent _on_tv_ip_setting_changed from triggering reconnection loop
+        if new_ip_for_tv_device and new_ip_for_tv_device != tv_ip:
+            def update_tv_ip(new_tv_ip: str) -> None:
+                self._ip_discovery_in_progress = True
+                self._settings.set_string("tv-ip", new_tv_ip)
+                self._ip_discovery_in_progress = False
+                return False  # For GLib.idle_add compatibility
+            GLib.idle_add(update_tv_ip, new_ip_for_tv_device)
+            logger.info(f"Updated tv-ip from {tv_ip} to {new_ip_for_tv_device}")
+        
+        # If we found the last connected device at a new IP, update and connect
+        if new_ip_for_last_device and new_ip_for_last_device != last_ip:
+            GLib.idle_add(self._save_last_ip, new_ip_for_last_device)
+            GLib.idle_add(self._on_discovery_complete, new_ip_for_last_device, new_ip_for_tv_device, None)
+        elif paired_devices:
+            # Connect to first available paired device
+            first_ip = paired_devices[0]["ip"]
+            GLib.idle_add(self._on_discovery_complete, first_ip, new_ip_for_tv_device, None)
+        else:
+            GLib.idle_add(self._on_discovery_complete, None, new_ip_for_tv_device, "No paired devices found")
+    
+    def _on_discovery_complete(self, found_ip: str | None, found_tv_ip: str | None, error_msg: str | None) -> None:
+        """Called when IP discovery completes.
+        
+        Args:
+            found_ip: New IP for main device (last-connected-ip)
+            found_tv_ip: New IP for TV device (tv-ip)
+            error_msg: Error message if discovery failed
+        """
+        self._remote_panel.set_connection_status(None)
+        
+        if error_msg:
+            logger.info(f"IP discovery: {error_msg}")
+            return
+        
+        if found_tv_ip:
+            logger.info(f"IP discovery updated TV device IP to {found_tv_ip}")
+        
+        if found_ip:
+            logger.info(f"IP discovery found device at {found_ip}, connecting...")
+            self._connect_ip(found_ip, silent=False)
 
     def _save_last_ip(self, ip: str) -> None:
         """Save the successfully connected IP address to settings."""
         self._settings.set_string("last-connected-ip", ip)
+        return False  # For GLib.idle_add compatibility
 
     def _create_actions(self) -> None:
         connect_ip = Gio.SimpleAction.new("connect_ip", GLib.VariantType.new("s"))
@@ -797,6 +1034,10 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_tv_ip_setting_changed(self, settings: Gio.Settings, key: str) -> None:
         """Called when TV IP setting changes - reconnect TV scrcpy if needed."""
+        # Skip if this change is from IP discovery (to prevent reconnection loop)
+        if self._ip_discovery_in_progress:
+            return
+        
         # Only process if we have an active main connection
         if not self._scrcpy or not self._scrcpy.connected:
             return
