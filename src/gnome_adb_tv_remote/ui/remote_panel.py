@@ -343,6 +343,27 @@ class RemotePanel(Gtk.Box):
             else:
                 self._search_shortcut_label.set_text("")
                 self._search_shortcut_label.set_visible(False)
+        
+        # Update mute button tooltip with keyboard shortcut
+        if self._mute_button:
+            mute_shortcut = get_action_tooltip("volume-mute", settings)
+            if mute_shortcut:
+                self._mute_button.set_tooltip_text(f"Mute: {mute_shortcut}")
+            else:
+                self._mute_button.set_tooltip_text("Mute")
+        
+        # Update volume slider tooltip with keyboard shortcuts
+        if self._volume_slider:
+            vol_up_shortcut = get_action_tooltip("volume-up", settings)
+            vol_down_shortcut = get_action_tooltip("volume-down", settings)
+            if vol_up_shortcut and vol_down_shortcut:
+                self._volume_slider.set_tooltip_text(f"Volume\nUp: {vol_up_shortcut}\nDown: {vol_down_shortcut}")
+            elif vol_up_shortcut:
+                self._volume_slider.set_tooltip_text(f"Volume\nUp: {vol_up_shortcut}")
+            elif vol_down_shortcut:
+                self._volume_slider.set_tooltip_text(f"Volume\nDown: {vol_down_shortcut}")
+            else:
+                self._volume_slider.set_tooltip_text("Volume")
 
     def set_connection_status(self, status: str | None) -> None:
         """Set connection status message.
