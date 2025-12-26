@@ -642,7 +642,7 @@ class RemotePanel(Gtk.Box):
         # Row 3: Now Playing widget
         self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._now_playing_box.add_css_class("now-playing-box")
-        self._now_playing_box.set_halign(Gtk.Align.CENTER)
+        self._now_playing_box.set_hexpand(True)
         
         # Playing icon
         self._now_playing_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
@@ -652,19 +652,22 @@ class RemotePanel(Gtk.Box):
         # Text container
         text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         text_box.set_valign(Gtk.Align.CENTER)
+        text_box.set_hexpand(True)
         
         self._now_playing_title = Gtk.Label(label="")
         self._now_playing_title.add_css_class("now-playing-title")
         self._now_playing_title.set_halign(Gtk.Align.START)
         self._now_playing_title.set_ellipsize(3)  # Pango.EllipsizeMode.END
-        self._now_playing_title.set_max_width_chars(35)
+        self._now_playing_title.set_hexpand(True)
+        self._now_playing_title.set_xalign(0)
         text_box.append(self._now_playing_title)
         
         self._now_playing_artist = Gtk.Label(label="")
         self._now_playing_artist.add_css_class("now-playing-artist")
         self._now_playing_artist.set_halign(Gtk.Align.START)
         self._now_playing_artist.set_ellipsize(3)  # Pango.EllipsizeMode.END
-        self._now_playing_artist.set_max_width_chars(35)
+        self._now_playing_artist.set_hexpand(True)
+        self._now_playing_artist.set_xalign(0)
         text_box.append(self._now_playing_artist)
         
         self._now_playing_box.append(text_box)
