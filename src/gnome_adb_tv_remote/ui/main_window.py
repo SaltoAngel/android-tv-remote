@@ -78,6 +78,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._tv_device_info: DeviceInfo | None = None
         self._tv_scrcpy_required: bool = False  # True when TV scrcpy is needed but not yet connected
         self._ip_discovery_in_progress: bool = False  # Flag to prevent reconnect loop during IP discovery
+        self._tv_discovery_attempted: bool = False  # Flag to prevent retrying TV discovery infinitely
         self._device_has_input_support: bool = True  # Whether connected device has native TV Input support
         self._input_device_dialog: InputDeviceDialog | None = None
         self._pending_tv_remote_dialog_ip: str | None = None  # IP to open TV remote dialog for after connection
@@ -726,6 +727,7 @@ class MainWindow(Adw.ApplicationWindow):
         if tv_ip and tv_ip.strip() and tv_ip.strip() != self._connected_ip:
             # Disable Input button until TV scrcpy connects
             self._tv_scrcpy_required = True
+            self._tv_discovery_attempted = False  # Reset discovery flag for fresh connection attempt
             self._remote_panel.set_input_button_sensitive(False)
             self._start_tv_scrcpy_async(tv_ip.strip())
         else:
@@ -1117,20 +1119,220 @@ class MainWindow(Adw.ApplicationWindow):
         self._remote_panel.set_input_button_tooltip(f"Input ({device_name})")
         logger.info(f"TV scrcpy connected to {tv_adb.host} ({device_name}) - Input button will use fast connection")
         
+        # Store TV device model info to discovered-devices for future IP discovery
+        if tv_device_info and tv_device_info.model:
+            self._store_tv_device_model(tv_adb.host, tv_device_info)
+        
         # If we have a pending TV remote dialog to open, do it now
         if self._pending_tv_remote_dialog_ip:
             ip = self._pending_tv_remote_dialog_ip
             self._pending_tv_remote_dialog_ip = None
             self._open_tv_remote_dialog(ip)
     
+    def _store_tv_device_model(self, ip: str, device_info: DeviceInfo) -> None:
+        """Store TV device model info to discovered-devices for future IP discovery.
+        
+        This ensures that when the TV device's IP changes, we can identify it
+        by its model name during network discovery.
+        
+        Args:
+            ip: The TV device's IP address.
+            device_info: Device info containing model, version, etc.
+        """
+        stored_devices_json = self._settings.get_string("discovered-devices")
+        stored_devices: list[dict] = []
+        try:
+            if stored_devices_json:
+                stored_devices = json.loads(stored_devices_json)
+        except Exception:
+            pass
+        
+        # Check if this IP already exists in stored devices
+        found = False
+        for dev in stored_devices:
+            if dev.get("ip") == ip:
+                # Update model info
+                dev["model"] = device_info.model
+                if device_info.version:
+                    dev["version"] = device_info.version
+                found = True
+                break
+        
+        # If not found, add as new entry
+        if not found:
+            stored_devices.append({
+                "ip": ip,
+                "model": device_info.model,
+                "version": device_info.version,
+                "latency_ms": 0,  # Unknown latency
+            })
+        
+        # Save updated devices
+        self._settings.set_string("discovered-devices", json.dumps(stored_devices))
+        logger.info(f"Stored TV device model '{device_info.model}' for IP {ip}")
+
+    
     def _on_tv_scrcpy_failed(self) -> None:
-        """Called when TV scrcpy fails to connect."""
-        self._tv_scrcpy_required = False  # Give up on requirement
-        self._pending_tv_remote_dialog_ip = None  # Clear pending dialog
-        # Enable Input button - it will fall back to normal behavior (no TV routing)
-        self._remote_panel.set_input_button_sensitive(True)
-        self._remote_panel.set_input_button_tooltip("Input")
-        logger.info("TV scrcpy unavailable - Input button will use normal mode")
+        """Called when TV scrcpy fails to connect.
+        
+        Triggers IP discovery to find the TV device at its new IP address,
+        then retries the connection. Only attempts discovery once per connection
+        session to prevent infinite loops if the device is offline.
+        """
+        # Check if we already tried discovery - if so, the device is likely offline
+        if self._tv_discovery_attempted:
+            logger.info("TV scrcpy failed after discovery - device likely offline")
+            self._tv_scrcpy_required = False
+            self._pending_tv_remote_dialog_ip = None
+            self._remote_panel.set_input_button_sensitive(True)
+            self._remote_panel.set_input_button_tooltip("Input (TV offline)")
+            return
+        
+        self._tv_discovery_attempted = True
+        logger.info("TV scrcpy connection failed - starting IP discovery for TV device")
+        
+        # Keep Input button disabled during discovery
+        self._remote_panel.set_input_button_sensitive(False)
+        self._remote_panel.set_input_button_tooltip("Searching for TV device…")
+        
+        # Start discovery in background thread
+        threading.Thread(
+            target=self._discover_tv_device_ip,
+            name="tv-ip-discovery",
+            daemon=True
+        ).start()
+    
+    def _discover_tv_device_ip(self) -> None:
+        """Scan network to find the TV device's new IP address.
+        
+        This runs in a background thread. It:
+        1. Gets the stored TV device model from settings
+        2. Scans for devices with ADB port open
+        3. Checks which ones are paired and matches the TV device model
+        4. Updates tv-ip setting and retries connection
+        """
+        # Load stored device info to get TV device model
+        stored_devices_json = self._settings.get_string("discovered-devices")
+        stored_devices: list[dict] = []
+        try:
+            if stored_devices_json:
+                stored_devices = json.loads(stored_devices_json)
+        except Exception:
+            pass
+        
+        # Get TV IP device's model (if we have it stored)
+        tv_ip = self._settings.get_string("tv-ip")
+        tv_device_model: str | None = None
+        if tv_ip:
+            for dev in stored_devices:
+                if dev.get("ip") == tv_ip:
+                    tv_device_model = dev.get("model")
+                    break
+        
+        if not tv_device_model:
+            logger.warning("Cannot discover TV device - no model info stored")
+            GLib.idle_add(self._on_tv_discovery_complete, None)
+            return
+        
+        # Get networks to scan
+        nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
+        if not nets:
+            logger.warning("No networks found for TV device discovery")
+            GLib.idle_add(self._on_tv_discovery_complete, None)
+            return
+        
+        # Scan for devices
+        scanner = SubnetScanner(port=5555, timeout_s=0.35, concurrency=256)
+        found_hosts: list[HostFound] = []
+        
+        def on_found(host: HostFound) -> None:
+            found_hosts.append(host)
+        
+        try:
+            scanner.scan(nets, on_found=on_found)
+        except Exception as e:
+            logger.error(f"Network scan for TV device failed: {e}")
+            GLib.idle_add(self._on_tv_discovery_complete, None)
+            return
+        
+        if not found_hosts:
+            logger.info("No devices found during TV device discovery")
+            GLib.idle_add(self._on_tv_discovery_complete, None)
+            return
+        
+        # Check each found device for pairing status and match model
+        new_tv_ip: str | None = None
+        
+        for host in found_hosts:
+            ip = str(host.ip)
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
+                if not client.is_paired_silent():
+                    continue
+                
+                # Device is paired - check if it matches our TV device
+                try:
+                    client.connect()
+                    device_info = client.get_device_info()
+                    client.disconnect()
+                except Exception:
+                    continue
+                
+                if device_info and device_info.model == tv_device_model:
+                    new_tv_ip = ip
+                    logger.info(f"Found TV device '{tv_device_model}' at new IP: {ip}")
+                    break
+                
+            except Exception as e:
+                logger.debug(f"Failed to check device at {ip}: {e}")
+                continue
+        
+        # Update tv-ip setting if found at new address
+        if new_tv_ip and new_tv_ip != tv_ip:
+            def update_tv_ip_setting() -> bool:
+                self._ip_discovery_in_progress = True
+                self._settings.set_string("tv-ip", new_tv_ip)
+                self._ip_discovery_in_progress = False
+                return False
+            GLib.idle_add(update_tv_ip_setting)
+            
+            # Also update stored devices
+            for dev in stored_devices:
+                if dev.get("model") == tv_device_model:
+                    dev["ip"] = new_tv_ip
+                    break
+            GLib.idle_add(
+                lambda: (self._settings.set_string("discovered-devices", json.dumps(stored_devices)), False)[1]
+            )
+            
+            logger.info(f"Updated tv-ip from {tv_ip} to {new_tv_ip}")
+        
+        GLib.idle_add(self._on_tv_discovery_complete, new_tv_ip)
+    
+    def _on_tv_discovery_complete(self, new_tv_ip: str | None) -> bool:
+        """Called when TV device IP discovery completes.
+        
+        Args:
+            new_tv_ip: New IP for TV device, or None if not found.
+            
+        Returns:
+            False for GLib.idle_add compatibility.
+        """
+        if new_tv_ip:
+            logger.info(f"TV device found at {new_tv_ip}, retrying connection...")
+            # Retry TV scrcpy connection with new IP
+            self._tv_scrcpy_required = True
+            self._remote_panel.set_input_button_tooltip("Connecting to TV…")
+            self._start_tv_scrcpy_async(new_tv_ip)
+        else:
+            # Discovery failed - give up on TV connection
+            self._tv_scrcpy_required = False
+            self._pending_tv_remote_dialog_ip = None
+            self._remote_panel.set_input_button_sensitive(True)
+            self._remote_panel.set_input_button_tooltip("Input")
+            logger.info("TV device not found - Input button will use normal mode")
+        
+        return False
 
     def _on_tv_ip_setting_changed(self, settings: Gio.Settings, key: str) -> None:
         """Called when TV IP setting changes - reconnect TV scrcpy if needed."""
@@ -1164,6 +1366,7 @@ class MainWindow(Adw.ApplicationWindow):
         if tv_ip and tv_ip.strip() and tv_ip.strip() != self._connected_ip:
             # Disable Input button until TV scrcpy connects
             self._tv_scrcpy_required = True
+            self._tv_discovery_attempted = False  # Reset discovery flag for fresh connection attempt
             self._remote_panel.set_input_button_sensitive(False)
             self._start_tv_scrcpy_async(tv_ip.strip())
             logger.info(f"TV IP changed to {tv_ip} - reconnecting TV scrcpy")
