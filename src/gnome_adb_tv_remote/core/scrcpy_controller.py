@@ -479,3 +479,24 @@ class ScrcpyServerController:
             if self._on_disconnect:
                 self._on_disconnect()
 
+    def expand_notification_panel(self) -> None:
+        """
+        Expand the notification panel on the device.
+        
+        This opens the notification/quick settings panel on Android TV.
+        """
+        if not self._connected or not self._control_socket:
+            return
+
+        # Control message format for expand notification panel:
+        # - type (1 byte): SC_CONTROL_MSG_TYPE_EXPAND_NOTIFICATION_PANEL = 5
+        msg = struct.pack(">B", SC_CONTROL_MSG_TYPE_EXPAND_NOTIFICATION_PANEL)
+
+        try:
+            self._control_socket.sendall(msg)
+        except Exception as e:
+            logger.error(f"Failed to expand notification panel: {e}")
+            self._connected = False
+            if self._on_disconnect:
+                self._on_disconnect()
+

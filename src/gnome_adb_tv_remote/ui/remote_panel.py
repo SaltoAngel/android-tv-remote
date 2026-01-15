@@ -224,8 +224,9 @@ class RemotePanel(Gtk.Box):
         self._add_search_button(1, 4, icon_name="system-search-symbolic")
         self._add_key_button("Assistant", "KEYCODE_ASSIST", 2, 4, icon_name="audio-input-microphone-symbolic")
         
-        # Row 5: Subtitles, Input
+        # Row 5: Subtitles, Notifications, Input
         self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 0, 5, icon_name="media-view-subtitles-symbolic")
+        self._add_notifications_button(1, 5, icon_name="preferences-system-notifications-symbolic")
         self._add_key_button("Input", "KEYCODE_TV_INPUT", 2, 5, icon_name="video-display-symbolic")
         
         
@@ -248,10 +249,11 @@ class RemotePanel(Gtk.Box):
         
         self.append(self._keyboard_entry)
 
-    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None) -> None:
+    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None, on_notifications=None) -> None:
         self._on_keyevent = on_keyevent
         self._on_text = on_text
         self._on_volume_change = on_volume_change
+        self._on_notifications = on_notifications
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
@@ -344,6 +346,15 @@ class RemotePanel(Gtk.Box):
             # Keep shortcut label hidden
             if self._search_shortcut_label:
                 self._search_shortcut_label.set_visible(False)
+        
+        # Update notifications button tooltip
+        if self._notifications_button:
+            notif_tooltip = get_action_tooltip("notifications", settings)
+            if notif_tooltip:
+                self._notifications_button.set_tooltip_text(f"Notifications: {notif_tooltip}")
+            # Keep shortcut label hidden
+            if self._notifications_shortcut_label:
+                self._notifications_shortcut_label.set_visible(False)
         
         # Update mute button tooltip with keyboard shortcut
         if self._mute_button:
@@ -509,6 +520,11 @@ class RemotePanel(Gtk.Box):
             return
         flash_button(btn)
 
+    def flash_notifications_button(self) -> None:
+        """Flash the notifications button to show visual feedback."""
+        if self._notifications_button:
+            flash_button(self._notifications_button)
+
     def _add_key_button(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
         # Create button
         btn = Gtk.Button()
@@ -604,6 +620,47 @@ class RemotePanel(Gtk.Box):
         # Store references
         self._search_button = btn
         self._search_shortcut_label = shortcut_label
+
+    def _add_notifications_button(self, col: int, row: int, icon_name: str | None = None) -> None:
+        """Add Notifications button that expands the notification panel."""
+        self._on_notifications = None  # Callback to be set by MainWindow
+        
+        # Create button
+        btn = Gtk.Button()
+        btn.add_css_class("remote-button")
+        btn.set_hexpand(True)
+        btn.set_vexpand(True)
+        btn.set_tooltip_text("Notifications")
+        btn.connect("clicked", lambda *_: self._on_notifications and self._on_notifications())
+        
+        # Create vertical box for icon and shortcut
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.set_valign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.CENTER)
+        
+        # Main content (icon)
+        if icon_name:
+            image = create_icon(icon_name)
+            box.append(image)
+        
+        # Shortcut label (hidden by default, same style as other buttons)
+        shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
+        shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
+        shortcut_label.set_max_width_chars(12)
+        shortcut_label.set_wrap(True)
+        shortcut_label.set_justify(Gtk.Justification.CENTER)
+        box.append(shortcut_label)
+        
+        # Set box as button child
+        btn.set_child(box)
+        
+        # Attach to grid
+        self._grid.attach(btn, col, row, 1, 1)
+        
+        # Store references
+        self._notifications_button = btn
+        self._notifications_shortcut_label = shortcut_label
 
     def _add_action_button(self, label: str, col: int, row: int, icon_name: str | None = None, callback=None) -> Gtk.Button:
         """Add a button that calls a callback when clicked (not a keycode).

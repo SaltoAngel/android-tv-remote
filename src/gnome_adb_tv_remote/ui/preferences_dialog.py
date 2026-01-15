@@ -43,6 +43,7 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "tv-input": ["t"],
     "focus-keyboard": ["Tab"],
     "search": ["f"],
+    "notifications": ["n"],
 }
 
 # Action to ADB keycode mapping
@@ -68,6 +69,7 @@ ACTION_TO_KEYCODE: dict[str, str] = {
     "tv-input": "KEYCODE_TV_INPUT",
     "focus-keyboard": None,  # Special action, not an ADB keycode
     "search": None,  # Special action, sends text "s" instead of keycode
+    "notifications": None,  # Special action, expands notification panel
 }
 
 # Human-readable action names
@@ -93,6 +95,7 @@ ACTION_LABELS: dict[str, str] = {
     "tv-input": "Input",
     "focus-keyboard": "Focus Keyboard",
     "search": "Find (YouTube)",
+    "notifications": "Notifications",
 }
 
 ACTION_CATEGORIES: dict[str, list[str]] = {
@@ -100,7 +103,7 @@ ACTION_CATEGORIES: dict[str, list[str]] = {
     "System": ["back", "home", "menu", "apps", "assistant"],
     "Volume": ["volume-up", "volume-down", "volume-mute"],
     "Media": ["play-pause", "previous", "next"],
-    "TV Controls": ["power", "captions", "tv-input"],
+    "TV Controls": ["power", "captions", "tv-input", "notifications"],
     "Other": ["focus-keyboard", "search"],
 }
 
@@ -428,6 +431,17 @@ def get_search_keys(settings: Gio.Settings) -> list[int]:
     shortcuts = _load_shortcuts_dict(settings)
     keyvals = []
     for key_name in shortcuts.get("search", []):
+        keyval = gdk_name_to_keyval(key_name)
+        if keyval is not None:
+            keyvals.append(keyval)
+    return keyvals
+
+
+def get_notifications_keys(settings: Gio.Settings) -> list[int]:
+    """Get the Gdk keyvals for the notifications action."""
+    shortcuts = _load_shortcuts_dict(settings)
+    keyvals = []
+    for key_name in shortcuts.get("notifications", []):
         keyval = gdk_name_to_keyval(key_name)
         if keyval is not None:
             keyvals.append(keyval)

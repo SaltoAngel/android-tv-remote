@@ -35,6 +35,7 @@ from .preferences_dialog import (  # noqa: E402
     load_shortcuts_from_settings,
     get_focus_keyboard_keys,
     get_search_keys,
+    get_notifications_keys,
 )
 from .remote_panel import RemotePanel  # noqa: E402
 from .info_dialog import InfoDialog  # noqa: E402
@@ -120,6 +121,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_keyevent=self._on_remote_keyevent,
             on_text=self._on_remote_text,
             on_volume_change=self._on_volume_change,
+            on_notifications=self._on_notifications,
         )
         
         # Track current volume for slider changes
@@ -158,6 +160,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._key_map = load_shortcuts_from_settings(self._settings)
         self._focus_keyboard_keys = get_focus_keyboard_keys(self._settings)
         self._search_keys = get_search_keys(self._settings)
+        self._notifications_keys = get_notifications_keys(self._settings)
         # Update button tooltips
         if hasattr(self, "_remote_panel"):
             self._remote_panel.update_tooltips(self._settings)
@@ -802,6 +805,12 @@ class MainWindow(Adw.ApplicationWindow):
             self._remote_panel.focus_keyboard()
             return True
 
+        # Handle notifications shortcut (opens notification panel)
+        if keyval in self._notifications_keys or lower_keyval in self._notifications_keys:
+            self._remote_panel.flash_notifications_button()
+            self._on_notifications()
+            return True
+
         # Handle TV Input shortcut (T key)
         # Skip if TV scrcpy is required but not yet connected
         if keyval in (Gdk.KEY_t, Gdk.KEY_T):
@@ -880,6 +889,22 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             logger.error(f"scrcpy text input failed: {e}")
             self._toast("Failed to send text input to TV.")
+
+    def _on_notifications(self) -> None:
+        """Expand the notification panel on the device.
+        
+        This opens the notification/quick settings panel on Android TV.
+        """
+        scrcpy = self._scrcpy
+        if not scrcpy or not scrcpy.connected:
+            self._toast("Device is not connected.")
+            return
+
+        try:
+            scrcpy.expand_notification_panel()
+        except Exception as e:
+            logger.error(f"Failed to expand notification panel: {e}")
+            self._toast("Failed to open notifications.")
 
     def _open_tv_remote_dialog(self, tv_ip: str) -> None:
         """Open the TV remote dialog for controlling the external TV device.
