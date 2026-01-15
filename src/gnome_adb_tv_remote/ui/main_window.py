@@ -124,6 +124,8 @@ class MainWindow(Adw.ApplicationWindow):
             on_keyevent=self._on_remote_keyevent,
             on_text=self._on_remote_text,
             on_volume_change=self._on_volume_change,
+            on_app_launcher=self._on_app_launcher_clicked,
+            on_app_switcher=self._on_app_switcher_clicked,
         )
         
         # Track current volume for slider changes
@@ -222,21 +224,6 @@ class MainWindow(Adw.ApplicationWindow):
         prefs_btn.set_tooltip_text("Configure Shortcuts")
         prefs_btn.connect("clicked", self._on_preferences_clicked)
         header.pack_end(prefs_btn)
-
-        # App Launcher button
-        self._app_launcher_btn = Gtk.Button(icon_name="view-app-grid-symbolic")
-        self._app_launcher_btn.set_tooltip_text("Applications (Ctrl+A)")
-        self._app_launcher_btn.connect("clicked", self._on_app_launcher_clicked)
-        self._app_launcher_btn.set_sensitive(False)
-        header.pack_end(self._app_launcher_btn)
-
-        # App Switcher button
-        self._app_switcher_btn = Gtk.Button(icon_name="view-paged-symbolic")
-        self._app_switcher_btn.set_tooltip_text("Switch App (Ctrl+Tab)")
-        self._app_switcher_btn.connect("clicked", self._on_app_switcher_clicked)
-        self._app_switcher_btn.set_sensitive(False)
-        header.pack_end(self._app_switcher_btn)
-
 
         # Content (remote)
         self._remote_panel = RemotePanel()
@@ -569,8 +556,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Only enable buttons when scrcpy is ready
         self._remote_panel.set_sensitive(connected and scrcpy_ready)
         # App launcher/switcher buttons depend on ADB connection (not scrcpy)
-        self._app_launcher_btn.set_sensitive(connected)
-        self._app_switcher_btn.set_sensitive(connected)
+        self._remote_panel.set_app_buttons_sensitive(connected)
         if not connected:
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
