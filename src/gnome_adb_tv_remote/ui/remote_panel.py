@@ -383,6 +383,22 @@ class RemotePanel(Gtk.Box):
             else:
                 self._volume_slider.set_tooltip_text("Volume")
 
+        # Update App Switcher button tooltip
+        if hasattr(self, '_app_switcher_btn'):
+            switcher_shortcut = get_action_tooltip("app-switcher", settings)
+            if switcher_shortcut:
+                self._app_switcher_btn.set_tooltip_text(f"Switch App: {switcher_shortcut}")
+            else:
+                self._app_switcher_btn.set_tooltip_text("Switch App")
+
+        # Update App Launcher button tooltip
+        if hasattr(self, '_app_launcher_btn'):
+            launcher_shortcut = get_action_tooltip("app-launcher", settings)
+            if launcher_shortcut:
+                self._app_launcher_btn.set_tooltip_text(f"Applications: {launcher_shortcut}")
+            else:
+                self._app_launcher_btn.set_tooltip_text("Applications")
+
     def set_connection_status(self, status: str | None) -> None:
         """Set connection status message.
         

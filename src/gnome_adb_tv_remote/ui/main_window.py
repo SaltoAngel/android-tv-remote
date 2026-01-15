@@ -35,6 +35,8 @@ from .preferences_dialog import (  # noqa: E402
     load_shortcuts_from_settings,
     get_focus_keyboard_keys,
     get_search_keys,
+    get_app_switcher_keys,
+    get_app_launcher_keys,
 )
 from .remote_panel import RemotePanel  # noqa: E402
 from .info_dialog import InfoDialog  # noqa: E402
@@ -116,6 +118,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._key_map: dict[int, str] = {}
         self._focus_keyboard_keys: list[int] = []
         self._search_keys: list[int] = []
+        self._app_switcher_keys: list[int] = []
+        self._app_launcher_keys: list[int] = []
         self.reload_shortcuts()
 
         self._build_ui()
@@ -164,6 +168,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._key_map = load_shortcuts_from_settings(self._settings)
         self._focus_keyboard_keys = get_focus_keyboard_keys(self._settings)
         self._search_keys = get_search_keys(self._settings)
+        self._app_switcher_keys = get_app_switcher_keys(self._settings)
+        self._app_launcher_keys = get_app_launcher_keys(self._settings)
         # Update button tooltips
         if hasattr(self, "_remote_panel"):
             self._remote_panel.update_tooltips(self._settings)
@@ -815,15 +821,18 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts."""
-        # Handle Ctrl+Tab for app switcher (works even without scrcpy)
-        if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval == Gdk.KEY_Tab:
+        # Prepare lower-case keyval for fallback (handling Caps Lock)
+        lower_keyval = Gdk.keyval_to_lower(keyval)
+
+        # Handle configurable app switcher shortcut (works even without scrcpy)
+        if keyval in self._app_switcher_keys or lower_keyval in self._app_switcher_keys:
             if self._adb and self._adb.connected:
                 self._on_app_switcher_clicked()
                 return True
             return False
 
-        # Handle Ctrl+A for app launcher (works even without scrcpy)
-        if (_state & Gdk.ModifierType.CONTROL_MASK) and keyval in (Gdk.KEY_a, Gdk.KEY_A):
+        # Handle configurable app launcher shortcut (works even without scrcpy)
+        if keyval in self._app_launcher_keys or lower_keyval in self._app_launcher_keys:
             if self._adb and self._adb.connected:
                 self._on_app_launcher_clicked()
                 return True
@@ -847,9 +856,6 @@ class MainWindow(Adw.ApplicationWindow):
         focus = self.get_focus()
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
-
-        # Prepare lower-case keyval for fallback (handling Caps Lock)
-        lower_keyval = Gdk.keyval_to_lower(keyval)
 
         # Handle focus keyboard shortcut (configurable)
         if keyval in self._focus_keyboard_keys or lower_keyval in self._focus_keyboard_keys:

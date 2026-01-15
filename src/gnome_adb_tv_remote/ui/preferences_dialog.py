@@ -43,6 +43,8 @@ DEFAULT_SHORTCUTS: dict[str, list[str]] = {
     "tv-input": ["t"],
     "focus-keyboard": ["Tab"],
     "search": ["f"],
+    "app-switcher": ["grave"],  # ` key - opens app switcher dialog
+    "app-launcher": ["o"],  # O key - opens app launcher dialog
 }
 
 # Action to ADB keycode mapping
@@ -68,6 +70,8 @@ ACTION_TO_KEYCODE: dict[str, str] = {
     "tv-input": "KEYCODE_TV_INPUT",
     "focus-keyboard": None,  # Special action, not an ADB keycode
     "search": None,  # Special action, sends text "s" instead of keycode
+    "app-switcher": None,  # Special action, opens app switcher dialog
+    "app-launcher": None,  # Special action, opens app launcher dialog
 }
 
 # Human-readable action names
@@ -93,6 +97,8 @@ ACTION_LABELS: dict[str, str] = {
     "tv-input": "Input",
     "focus-keyboard": "Focus Keyboard",
     "search": "Find (YouTube)",
+    "app-switcher": "Switch App",
+    "app-launcher": "Applications",
 }
 
 # Category groupings
@@ -102,6 +108,7 @@ ACTION_CATEGORIES: dict[str, list[str]] = {
     "Volume": ["volume-up", "volume-down", "volume-mute"],
     "Media": ["play-pause", "previous", "next"],
     "TV Controls": ["power", "captions", "tv-input"],
+    "App Management": ["app-switcher", "app-launcher"],
     "Other": ["focus-keyboard", "search"],
 }
 
@@ -126,6 +133,7 @@ def get_key_display_name(key_name: str) -> str:
         "KP_Add": "+",
         "KP_Subtract": "-",
         "Idotabove": "I",
+        "grave": "`",
     }
     return display_map.get(key_name, key_name.upper() if len(key_name) == 1 else key_name)
 
@@ -447,3 +455,24 @@ def get_action_tooltip(action: str, settings: Gio.Settings) -> str:
             return " / ".join(display_names)
     return ""
 
+
+def get_app_switcher_keys(settings: Gio.Settings) -> list[int]:
+    """Get the Gdk keyvals for the app-switcher action."""
+    shortcuts = _load_shortcuts_dict(settings)
+    keyvals = []
+    for key_name in shortcuts.get("app-switcher", []):
+        keyval = gdk_name_to_keyval(key_name)
+        if keyval is not None:
+            keyvals.append(keyval)
+    return keyvals
+
+
+def get_app_launcher_keys(settings: Gio.Settings) -> list[int]:
+    """Get the Gdk keyvals for the app-launcher action."""
+    shortcuts = _load_shortcuts_dict(settings)
+    keyvals = []
+    for key_name in shortcuts.get("app-launcher", []):
+        keyval = gdk_name_to_keyval(key_name)
+        if keyval is not None:
+            keyvals.append(keyval)
+    return keyvals
