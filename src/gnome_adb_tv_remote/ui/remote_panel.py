@@ -205,7 +205,13 @@ class RemotePanel(Gtk.Box):
         self._volume_max: int = 15  # Will be updated from device
         self._on_volume_change = None  # Callback for volume changes
         self._updating_slider = False  # Prevent feedback loops
+        self._volume_max: int = 15  # Will be updated from device
+        self._on_volume_change = None  # Callback for volume changes
+        self._updating_slider = False  # Prevent feedback loops
         self._is_muted: bool = False  # Track mute state for UI toggle
+        
+        # Cache for shortcuts to persist them when tooltips are updated dynamically
+        self._cached_shortcuts: dict[str, str] = {}
 
         # D-pad
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
@@ -278,8 +284,19 @@ class RemotePanel(Gtk.Box):
             "KEYCODE_DPAD_RIGHT": "Right",
         }
         
-        for keycode, shortcut_label in self._keycode_shortcut_labels.items():
-            action = KEYCODE_TO_ACTION.get(keycode)
+        # Updated mapping for tooltip lookup including media keys
+        tooltip_action_map = {
+            **KEYCODE_TO_ACTION,
+            "KEYCODE_MEDIA_PREVIOUS": "previous",
+            "KEYCODE_MEDIA_PLAY_PAUSE": "play-pause",
+            "KEYCODE_MEDIA_NEXT": "next",
+        }
+
+        # Clear cache before rebuilding
+        self._cached_shortcuts = {}
+
+        for keycode, btn in self._keycode_buttons.items():
+            action = tooltip_action_map.get(keycode)
             
             # Special handling for direction buttons: only show if changed from default
             if keycode in direction_keycodes:
@@ -288,62 +305,67 @@ class RemotePanel(Gtk.Box):
                 # Update tooltip to show all shortcuts
                 shortcut_text = get_action_tooltip(action, settings)
                 if shortcut_text:
-                    btn = self._keycode_buttons.get(keycode)
-                    if btn:
-                        btn.set_tooltip_text(f"{direction_names[keycode]}: {shortcut_text}")
+                    btn.set_tooltip_text(f"{direction_names[keycode]}: {shortcut_text}")
+                    self._cached_shortcuts[action] = shortcut_text
                 
-                # Never show shortcut label on direction buttons (UI requirement)
-                shortcut_label.set_visible(False)
+                # Never show shortcut label on direction buttons
+                if keycode in self._keycode_shortcut_labels:
+                    self._keycode_shortcut_labels[keycode].set_visible(False)
                 continue
             
-            # Special handling for Enter (dpad-center): update button label if changed
+            # Special handling for Enter (dpad-center)
             if keycode == "KEYCODE_DPAD_CENTER":
                 shortcut_text = get_action_tooltip("dpad-center", settings)
                 
-                # Update tooltip to show all shortcuts
                 if shortcut_text:
-                    btn = self._keycode_buttons.get(keycode)
-                    if btn:
-                        btn.set_tooltip_text(f"OK / Select: {shortcut_text}")
+                    btn.set_tooltip_text(f"OK / Select: {shortcut_text}")
+                    self._cached_shortcuts["dpad-center"] = shortcut_text
                 
-                # Never show shortcut label on center button (UI requirement)
-                shortcut_label.set_visible(False)
+                if keycode in self._keycode_shortcut_labels:
+                    self._keycode_shortcut_labels[keycode].set_visible(False)
                 continue
 
-            # Standard buttons: show shortcut in tooltip only, not on button
+            # Standard buttons and Media buttons
             if action:
                 shortcut_text = get_action_tooltip(action, settings)
                 if shortcut_text:
-                    btn = self._keycode_buttons.get(keycode)
-                    if btn:
-                        # Get action name for tooltip prefix
-                        action_names = {
-                            "back": "Back",
-                            "home": "Home",
-                            "menu": "Menu",
-                            "apps": "Apps",
-                            "assistant": "Assistant",
-                            "captions": "Subtitles",
-                            "tv-input": "Input",
-                        }
-                        action_name = action_names.get(action, action.replace("-", " ").title())
-                        btn.set_tooltip_text(f"{action_name}: {shortcut_text}")
-                # Keep shortcut label hidden
-                shortcut_label.set_visible(False)
+                    # Cache the shortcut
+                    self._cached_shortcuts[action] = shortcut_text
+                    
+                    # Get action name for tooltip prefix
+                    action_names = {
+                        "back": "Back",
+                        "home": "Home",
+                        "menu": "Menu",
+                        "apps": "Apps",
+                        "assistant": "Assistant",
+                        "captions": "Subtitles",
+                        "tv-input": "Input",
+                        "previous": "Prev",
+                        "play-pause": "Play/Pause",
+                        "next": "Next",
+                    }
+                    action_name = action_names.get(action, action.replace("-", " ").title())
+                    btn.set_tooltip_text(f"{action_name}: {shortcut_text}")
+            
+            # Keep shortcut label hidden for all buttons
+            if keycode in self._keycode_shortcut_labels:
+                self._keycode_shortcut_labels[keycode].set_visible(False)
         
         # Update keyboard entry placeholder with focus shortcut
         focus_tooltip = get_action_tooltip("focus-keyboard", settings)
         if focus_tooltip:
+            self._cached_shortcuts["focus-keyboard"] = focus_tooltip
             self._focus_keyboard_shortcut_text = focus_tooltip
             if not self._keyboard_focused:
                 self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
         
-        # Update search button tooltip (no label on button)
+        # Update search button tooltip
         if self._search_button:
             search_tooltip = get_action_tooltip("search", settings)
             if search_tooltip:
+                self._cached_shortcuts["search"] = search_tooltip
                 self._search_button.set_tooltip_text(f"Find (YouTube): {search_tooltip}")
-            # Keep shortcut label hidden
             if self._search_shortcut_label:
                 self._search_shortcut_label.set_visible(False)
         
@@ -351,29 +373,34 @@ class RemotePanel(Gtk.Box):
         if self._notifications_button:
             notif_tooltip = get_action_tooltip("notifications", settings)
             if notif_tooltip:
+                self._cached_shortcuts["notifications"] = notif_tooltip
                 self._notifications_button.set_tooltip_text(f"Notifications: {notif_tooltip}")
-            # Keep shortcut label hidden
             if self._notifications_shortcut_label:
                 self._notifications_shortcut_label.set_visible(False)
         
-        # Update mute button tooltip with keyboard shortcut
+        # Update mute button tooltip
         if self._mute_button:
             mute_shortcut = get_action_tooltip("volume-mute", settings)
             if mute_shortcut:
+                self._cached_shortcuts["volume-mute"] = mute_shortcut
                 self._mute_button.set_tooltip_text(f"Mute: {mute_shortcut}")
             else:
                 self._mute_button.set_tooltip_text("Mute")
         
-        # Update volume slider tooltip with keyboard shortcuts
+        # Update volume slider tooltip
         if self._volume_slider:
             vol_up_shortcut = get_action_tooltip("volume-up", settings)
             vol_down_shortcut = get_action_tooltip("volume-down", settings)
-            if vol_up_shortcut and vol_down_shortcut:
-                self._volume_slider.set_tooltip_text(f"Volume\nUp: {vol_up_shortcut}\nDown: {vol_down_shortcut}")
-            elif vol_up_shortcut:
-                self._volume_slider.set_tooltip_text(f"Volume\nUp: {vol_up_shortcut}")
-            elif vol_down_shortcut:
-                self._volume_slider.set_tooltip_text(f"Volume\nDown: {vol_down_shortcut}")
+            tooltip_parts = ["Volume"]
+            if vol_up_shortcut:
+                self._cached_shortcuts["volume-up"] = vol_up_shortcut
+                tooltip_parts.append(f"Up: {vol_up_shortcut}")
+            if vol_down_shortcut:
+                self._cached_shortcuts["volume-down"] = vol_down_shortcut
+                tooltip_parts.append(f"Down: {vol_down_shortcut}")
+            
+            if len(tooltip_parts) > 1:
+                self._volume_slider.set_tooltip_text("\n".join(tooltip_parts))
             else:
                 self._volume_slider.set_tooltip_text("Volume")
 
@@ -933,13 +960,19 @@ class RemotePanel(Gtk.Box):
             dimmed: If True, make the button appear faded.
         """
         btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
+        btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
         if btn:
+            tooltip_text = "Input (Select a device with TV inputs)" if dimmed else "Input"
+            shortcut = self._cached_shortcuts.get("tv-input")
+            if shortcut:
+                tooltip_text += f": {shortcut}"
+            
             if dimmed:
                 btn.add_css_class("input-button-dimmed")
-                btn.set_tooltip_text("Input (Select a device with TV inputs)")
             else:
                 btn.remove_css_class("input-button-dimmed")
-                btn.set_tooltip_text("Input")
+            
+            btn.set_tooltip_text(tooltip_text)
 
     def set_input_button_tooltip(self, tooltip: str) -> None:
         """Set custom tooltip for the Input button.
@@ -949,6 +982,9 @@ class RemotePanel(Gtk.Box):
         """
         btn = self._keycode_buttons.get("KEYCODE_TV_INPUT")
         if btn:
+            shortcut = self._cached_shortcuts.get("tv-input")
+            if shortcut:
+                tooltip += f": {shortcut}"
             btn.set_tooltip_text(tooltip)
 
     def update_now_playing(
