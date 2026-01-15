@@ -35,13 +35,9 @@ from .preferences_dialog import (  # noqa: E402
     load_shortcuts_from_settings,
     get_focus_keyboard_keys,
     get_search_keys,
-    get_app_switcher_keys,
-    get_app_launcher_keys,
 )
 from .remote_panel import RemotePanel  # noqa: E402
 from .info_dialog import InfoDialog  # noqa: E402
-from .app_launcher_dialog import AppLauncherDialog  # noqa: E402
-from .app_switcher_dialog import AppSwitcherDialog  # noqa: E402
 from .tv_remote_dialog import TvRemoteDialog  # noqa: E402
 from .input_device_dialog import InputDeviceDialog  # noqa: E402
 from ..core.mpris_service import MprisService  # noqa: E402
@@ -74,8 +70,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._device_dialog: DeviceDialog | None = None
         self._preferences_dialog: PreferencesDialog | None = None
         self._info_dialog: InfoDialog | None = None
-        self._app_launcher_dialog: AppLauncherDialog | None = None
-        self._app_switcher_dialog: AppSwitcherDialog | None = None
         self._tv_remote_dialog: TvRemoteDialog | None = None
         self._tv_device_info: DeviceInfo | None = None
         self._tv_scrcpy_required: bool = False  # True when TV scrcpy is needed but not yet connected
@@ -118,8 +112,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._key_map: dict[int, str] = {}
         self._focus_keyboard_keys: list[int] = []
         self._search_keys: list[int] = []
-        self._app_switcher_keys: list[int] = []
-        self._app_launcher_keys: list[int] = []
         self.reload_shortcuts()
 
         self._build_ui()
@@ -128,8 +120,6 @@ class MainWindow(Adw.ApplicationWindow):
             on_keyevent=self._on_remote_keyevent,
             on_text=self._on_remote_text,
             on_volume_change=self._on_volume_change,
-            on_app_launcher=self._on_app_launcher_clicked,
-            on_app_switcher=self._on_app_switcher_clicked,
         )
         
         # Track current volume for slider changes
@@ -168,8 +158,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._key_map = load_shortcuts_from_settings(self._settings)
         self._focus_keyboard_keys = get_focus_keyboard_keys(self._settings)
         self._search_keys = get_search_keys(self._settings)
-        self._app_switcher_keys = get_app_switcher_keys(self._settings)
-        self._app_launcher_keys = get_app_launcher_keys(self._settings)
         # Update button tooltips
         if hasattr(self, "_remote_panel"):
             self._remote_panel.update_tooltips(self._settings)
@@ -261,45 +249,6 @@ class MainWindow(Adw.ApplicationWindow):
             self._info_dialog = InfoDialog(self)
         self._info_dialog.present()
 
-    def _on_app_launcher_clicked(self, *_args) -> None:
-        """Open the app launcher dialog."""
-        if not self._adb or not self._adb.connected:
-            self._toast("Not connected to a device.")
-            return
-        self._app_launcher_dialog = AppLauncherDialog(
-            self._adb,
-            on_launch=self._on_app_launch
-        )
-        self._app_launcher_dialog.present(self)
-
-    def _on_app_switcher_clicked(self, *_args) -> None:
-        """Open the app switcher dialog."""
-        if not self._adb or not self._adb.connected:
-            self._toast("Not connected to a device.")
-            return
-        self._app_switcher_dialog = AppSwitcherDialog(
-            self._adb,
-            on_switch=self._on_app_launch
-        )
-        self._app_switcher_dialog.present(self)
-
-    def _on_app_launch(self, package_name: str) -> None:
-        """Launch an app on the TV."""
-        if not self._adb:
-            return
-
-        def worker():
-            try:
-                success = self._adb.launch_app(package_name)
-                if success:
-                    GLib.idle_add(self._toast, f"Launching {package_name.split('.')[-1]}...")
-                else:
-                    GLib.idle_add(self._toast, "Failed to launch app.")
-            except Exception as e:
-                logger.error(f"Failed to launch app: {e}")
-                GLib.idle_add(self._toast, "Failed to launch app.")
-
-        threading.Thread(target=worker, daemon=True).start()
 
     def _auto_connect_last_ip(self) -> None:
         """Load the last successfully connected IP address from settings and auto-connect.
@@ -561,8 +510,6 @@ class MainWindow(Adw.ApplicationWindow):
         self._connected_ip = ip if connected else None
         # Only enable buttons when scrcpy is ready
         self._remote_panel.set_sensitive(connected and scrcpy_ready)
-        # App launcher/switcher buttons depend on ADB connection (not scrcpy)
-        self._remote_panel.set_app_buttons_sensitive(connected)
         if not connected:
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
@@ -824,19 +771,6 @@ class MainWindow(Adw.ApplicationWindow):
         # Prepare lower-case keyval for fallback (handling Caps Lock)
         lower_keyval = Gdk.keyval_to_lower(keyval)
 
-        # Handle configurable app switcher shortcut (works even without scrcpy)
-        if keyval in self._app_switcher_keys or lower_keyval in self._app_switcher_keys:
-            if self._adb and self._adb.connected:
-                self._on_app_switcher_clicked()
-                return True
-            return False
-
-        # Handle configurable app launcher shortcut (works even without scrcpy)
-        if keyval in self._app_launcher_keys or lower_keyval in self._app_launcher_keys:
-            if self._adb and self._adb.connected:
-                self._on_app_launcher_clicked()
-                return True
-            return False
 
         # Ignore keyboard shortcuts if scrcpy is not ready
         scrcpy = self._scrcpy

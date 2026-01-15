@@ -190,8 +190,6 @@ class RemotePanel(Gtk.Box):
 
         self._on_keyevent = None
         self._on_text = None
-        self._on_app_launcher = None  # Callback for app launcher button
-        self._on_app_switcher = None  # Callback for app switcher button
 
         # Map keycode -> button for visual feedback
         self._keycode_buttons: dict[str, Gtk.Button] = {}
@@ -230,18 +228,6 @@ class RemotePanel(Gtk.Box):
         self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 0, 5, icon_name="media-view-subtitles-symbolic")
         self._add_key_button("Input", "KEYCODE_TV_INPUT", 2, 5, icon_name="video-display-symbolic")
         
-        # Row 6: Switch App, Applications (these require ADB connection but not scrcpy)
-        self._app_switcher_btn = self._add_action_button(
-            "Switch App", 0, 6, icon_name="view-paged-symbolic",
-            callback=lambda: self._on_app_switcher and self._on_app_switcher()
-        )
-        self._app_launcher_btn = self._add_action_button(
-            "Applications", 2, 6, icon_name="view-app-grid-symbolic",
-            callback=lambda: self._on_app_launcher and self._on_app_launcher()
-        )
-        # These buttons are disabled until connected
-        self._app_switcher_btn.set_sensitive(False)
-        self._app_launcher_btn.set_sensitive(False)
         
         # Media Controls Section (above keyboard)
         self._create_media_controls_section()
@@ -262,13 +248,10 @@ class RemotePanel(Gtk.Box):
         
         self.append(self._keyboard_entry)
 
-    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None,
-                     on_app_launcher=None, on_app_switcher=None) -> None:
+    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None) -> None:
         self._on_keyevent = on_keyevent
         self._on_text = on_text
         self._on_volume_change = on_volume_change
-        self._on_app_launcher = on_app_launcher
-        self._on_app_switcher = on_app_switcher
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
@@ -383,21 +366,6 @@ class RemotePanel(Gtk.Box):
             else:
                 self._volume_slider.set_tooltip_text("Volume")
 
-        # Update App Switcher button tooltip
-        if hasattr(self, '_app_switcher_btn'):
-            switcher_shortcut = get_action_tooltip("app-switcher", settings)
-            if switcher_shortcut:
-                self._app_switcher_btn.set_tooltip_text(f"Switch App: {switcher_shortcut}")
-            else:
-                self._app_switcher_btn.set_tooltip_text("Switch App")
-
-        # Update App Launcher button tooltip
-        if hasattr(self, '_app_launcher_btn'):
-            launcher_shortcut = get_action_tooltip("app-launcher", settings)
-            if launcher_shortcut:
-                self._app_launcher_btn.set_tooltip_text(f"Applications: {launcher_shortcut}")
-            else:
-                self._app_launcher_btn.set_tooltip_text("Applications")
 
     def set_connection_status(self, status: str | None) -> None:
         """Set connection status message.
@@ -421,19 +389,6 @@ class RemotePanel(Gtk.Box):
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
 
-    def set_app_buttons_sensitive(self, sensitive: bool) -> None:
-        """Set sensitivity of app launcher and app switcher buttons.
-        
-        These buttons require ADB connection but not scrcpy, so they have
-        separate sensitivity management from the main panel controls.
-        
-        Args:
-            sensitive: Whether buttons should be sensitive (clickable).
-        """
-        if hasattr(self, '_app_launcher_btn'):
-            self._app_launcher_btn.set_sensitive(sensitive)
-        if hasattr(self, '_app_switcher_btn'):
-            self._app_switcher_btn.set_sensitive(sensitive)
 
     def _on_keyboard_focus_enter(self, *_args) -> None:
         """Called when keyboard input area gains focus."""
