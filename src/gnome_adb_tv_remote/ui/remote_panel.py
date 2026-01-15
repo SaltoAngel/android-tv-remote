@@ -307,15 +307,26 @@ class RemotePanel(Gtk.Box):
                 shortcut_label.set_visible(False)
                 continue
 
-            # Standard buttons: always show shortcut
+            # Standard buttons: show shortcut in tooltip only, not on button
             if action:
                 shortcut_text = get_action_tooltip(action, settings)
                 if shortcut_text:
-                    shortcut_label.set_markup(f"<b>{shortcut_text}</b>")
-                    shortcut_label.set_visible(True)
-                else:
-                    shortcut_label.set_text("")
-                    shortcut_label.set_visible(False)
+                    btn = self._keycode_buttons.get(keycode)
+                    if btn:
+                        # Get action name for tooltip prefix
+                        action_names = {
+                            "back": "Back",
+                            "home": "Home",
+                            "menu": "Menu",
+                            "apps": "Apps",
+                            "assistant": "Assistant",
+                            "captions": "Subtitles",
+                            "tv-input": "Input",
+                        }
+                        action_name = action_names.get(action, action.replace("-", " ").title())
+                        btn.set_tooltip_text(f"{action_name}: {shortcut_text}")
+                # Keep shortcut label hidden
+                shortcut_label.set_visible(False)
         
         # Update keyboard entry placeholder with focus shortcut
         focus_tooltip = get_action_tooltip("focus-keyboard", settings)
@@ -324,14 +335,13 @@ class RemotePanel(Gtk.Box):
             if not self._keyboard_focused:
                 self._keyboard_entry.set_placeholder_text(f"Press {focus_tooltip} to focus keyboard")
         
-        # Update search button shortcut label
-        if self._search_shortcut_label:
+        # Update search button tooltip (no label on button)
+        if self._search_button:
             search_tooltip = get_action_tooltip("search", settings)
             if search_tooltip:
-                self._search_shortcut_label.set_markup(f"<b>{search_tooltip}</b>")
-                self._search_shortcut_label.set_visible(True)
-            else:
-                self._search_shortcut_label.set_text("")
+                self._search_button.set_tooltip_text(f"Find (YouTube): {search_tooltip}")
+            # Keep shortcut label hidden
+            if self._search_shortcut_label:
                 self._search_shortcut_label.set_visible(False)
         
         # Update mute button tooltip with keyboard shortcut
