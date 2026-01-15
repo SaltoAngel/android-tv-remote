@@ -127,6 +127,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Track current volume for slider changes
         self._current_volume: int = 0
         self._last_volume_change_time: float = 0.0
+        self._volume_refresh_timeout_id: int | None = None  # For debounced volume refresh
         self._remote_panel.update_tooltips(self._settings)
         # Update Power button tooltip
         self.reload_shortcuts()
@@ -735,6 +736,10 @@ class MainWindow(Adw.ApplicationWindow):
         if self._connect_thread:
             self._toast("Still connecting…")
             return
+        # Cancel any pending volume refresh
+        if self._volume_refresh_timeout_id is not None:
+            GLib.source_remove(self._volume_refresh_timeout_id)
+            self._volume_refresh_timeout_id = None
         # Stop MPRIS media polling
         self._stop_mpris_media_polling()
         # Disconnect scrcpy first
@@ -865,11 +870,15 @@ class MainWindow(Adw.ApplicationWindow):
             
             # Update volume slider when volume keys are pressed via keyboard shortcuts
             if keycode == "KEYCODE_VOLUME_UP":
+                self._last_volume_change_time = time.time()
                 self._current_volume = min(self._current_volume + 1, self._remote_panel._volume_max)
                 self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max, False)
+                self._schedule_volume_refresh()
             elif keycode == "KEYCODE_VOLUME_DOWN":
+                self._last_volume_change_time = time.time()
                 self._current_volume = max(self._current_volume - 1, 0)
                 self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max, False)
+                self._schedule_volume_refresh()
         except Exception as e:
             logger.error(f"scrcpy keyevent failed: {e}")
             self._toast("Failed to send command to TV.")
@@ -1023,8 +1032,38 @@ class MainWindow(Adw.ApplicationWindow):
             for _ in range(abs(diff)):
                 scrcpy.send_keycode(keycode)
             self._current_volume = new_volume
+            # Schedule debounced refresh to sync with actual device volume
+            self._schedule_volume_refresh()
         except Exception as e:
             logger.error(f"Failed to adjust volume: {e}")
+
+    def _schedule_volume_refresh(self) -> None:
+        """Schedule a debounced volume refresh from the device.
+        
+        Cancels any pending refresh and schedules a new one after 1 second.
+        This ensures that rapid volume changes don't trigger multiple refreshes,
+        and only the final state is synced with the device.
+        """
+        # Cancel any pending refresh
+        if self._volume_refresh_timeout_id is not None:
+            GLib.source_remove(self._volume_refresh_timeout_id)
+            self._volume_refresh_timeout_id = None
+        
+        # Schedule new refresh after 1 second
+        self._volume_refresh_timeout_id = GLib.timeout_add(
+            1000,  # 1 second
+            self._on_volume_refresh_timeout
+        )
+
+    def _on_volume_refresh_timeout(self) -> bool:
+        """Called after 1 second of no volume changes to sync with device.
+        
+        Returns:
+            False to prevent the timeout from repeating.
+        """
+        self._volume_refresh_timeout_id = None
+        self._update_volume_slider()
+        return False  # Don't repeat
 
     def _start_tv_scrcpy_async(self, tv_ip: str) -> None:
         """Start scrcpy-server for TV Input Routing in background.
