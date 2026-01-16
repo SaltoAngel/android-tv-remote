@@ -242,13 +242,17 @@ class RemotePanel(Gtk.Box):
         # Play/Pause button and icon for dynamic updates
         self._play_pause_button: Gtk.Button | None = None
         self._play_pause_icon: Gtk.Image | None = None
+        
+        # Key repeat timer for mouse hold-to-repeat on D-pad buttons
+        self._key_repeat_timer_id: int | None = None
+        self._key_repeat_keycode: str | None = None
 
-        # D-pad (rows 0-2)
-        self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
-        self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="keyboard_arrow_left-symbolic.svg")
+        # D-pad (rows 0-2) - these support hold-to-repeat for fast seeking
+        self._add_key_button_with_repeat("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
+        self._add_key_button_with_repeat("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="keyboard_arrow_left-symbolic.svg")
         self._add_key_button("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name="fiber_manual_record-symbolic.svg")
-        self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="keyboard_arrow_right-symbolic.svg")
-        self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="keyboard_arrow_down-symbolic.svg")
+        self._add_key_button_with_repeat("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="keyboard_arrow_right-symbolic.svg")
+        self._add_key_button_with_repeat("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="keyboard_arrow_down-symbolic.svg")
 
         # Row 3: Back, Home, Apps
         self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
@@ -630,6 +634,114 @@ class RemotePanel(Gtk.Box):
         # Register button and shortcut label for updates
         self._keycode_buttons[keycode] = btn
         self._keycode_shortcut_labels[keycode] = shortcut_label
+
+    def _add_key_button_with_repeat(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
+        """Add a key button that supports hold-to-repeat for mouse input.
+        
+        This is used for D-pad buttons where holding down the button should
+        continuously send key events (e.g., for fast seeking in videos).
+        """
+        # Create button
+        btn = Gtk.Button()
+        btn.add_css_class("remote-button")
+        btn.set_tooltip_text(label)
+        btn.set_hexpand(True)
+        btn.set_vexpand(True)
+        
+        # Create vertical box for content and shortcut
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.set_valign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.CENTER)
+        
+        # Main content (Icon or Label)
+        if icon_name:
+            if isinstance(icon_name, list):
+                icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+                icon_box.set_halign(Gtk.Align.CENTER)
+                for name in icon_name:
+                    image = create_icon(name)
+                    icon_box.append(image)
+                box.append(icon_box)
+            else:
+                image = create_icon(icon_name)
+                box.append(image)
+        else:
+            main_label = Gtk.Label(label=label)
+            main_label.set_markup(f"<b>{label}</b>")
+            box.append(main_label)
+        
+        # Shortcut label
+        shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
+        shortcut_label.set_visible(False)
+        shortcut_label.set_max_width_chars(12)
+        shortcut_label.set_wrap(True)
+        shortcut_label.set_justify(Gtk.Justification.CENTER)
+        box.append(shortcut_label)
+        
+        btn.set_child(box)
+        
+        # Add GestureClick for press-and-hold detection
+        # Use CAPTURE phase so we receive events before the button's internal handler
+        gesture = Gtk.GestureClick()
+        gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        gesture.connect("pressed", self._on_repeat_button_pressed, keycode)
+        gesture.connect("released", self._on_repeat_button_released)
+        gesture.connect("unpaired-release", self._on_repeat_button_unpaired_release)
+        # Note: We don't connect 'stopped' as it fires before 'released' and would stop our timer early
+        btn.add_controller(gesture)
+        
+        # Connect clicked signal for single click (this handles keyboard activation)
+        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
+        
+        self._grid.attach(btn, col, row, 1, 1)
+        
+        # Register button and shortcut label for updates
+        self._keycode_buttons[keycode] = btn
+        self._keycode_shortcut_labels[keycode] = shortcut_label
+
+    def _on_repeat_button_pressed(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float, keycode: str) -> None:
+        """Handle mouse press on a repeat-enabled button.
+        
+        We don't send a key event here - single clicks are handled by the
+        "clicked" signal. We only start a timer for hold-to-repeat.
+        """
+        # Stop any existing repeat timer
+        self._stop_key_repeat_timer()
+        
+        # Store the keycode and start the repeat timer after initial delay
+        # The first key event is sent by the "clicked" signal for single clicks.
+        # For held buttons, we start repeating after 500ms delay.
+        self._key_repeat_keycode = keycode
+        self._key_repeat_timer_id = GLib.timeout_add(500, self._on_key_repeat_start)
+    
+    def _on_repeat_button_released(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """Handle mouse release on a repeat-enabled button."""
+        self._stop_key_repeat_timer()
+    
+    def _on_repeat_button_unpaired_release(self, gesture: Gtk.GestureClick, x: float, y: float, button: int, sequence) -> None:
+        """Handle unpaired release (e.g., when pointer left button while pressed)."""
+        self._stop_key_repeat_timer()
+    
+    def _on_key_repeat_start(self) -> bool:
+        """Called after the initial delay to start fast key repeat."""
+        # Start fast repeat (every 50ms, ~20 keys/sec for smooth seeking)
+        self._key_repeat_timer_id = GLib.timeout_add(50, self._on_key_repeat_tick)
+        return False  # Don't repeat the initial delay timer
+    
+    def _on_key_repeat_tick(self) -> bool:
+        """Called on each repeat interval to send the key event."""
+        if self._key_repeat_keycode and self._on_keyevent:
+            self._on_keyevent(self._key_repeat_keycode)
+            return True  # Continue repeating
+        return False  # Stop if no keycode (shouldn't happen)
+    
+    def _stop_key_repeat_timer(self) -> None:
+        """Stop the key repeat timer and clear state."""
+        if self._key_repeat_timer_id is not None:
+            GLib.source_remove(self._key_repeat_timer_id)
+            self._key_repeat_timer_id = None
+        self._key_repeat_keycode = None
 
     def _add_search_button(self, col: int, row: int, icon_name: str | None = None) -> None:
         """Add Search button that sends text 's' for YouTube search."""
