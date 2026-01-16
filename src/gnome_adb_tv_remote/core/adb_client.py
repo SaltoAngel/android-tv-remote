@@ -275,6 +275,7 @@ class AdbTcpClient:
         package_name: str | None = None
         playback_state = "Stopped"
         position_ms = 0
+        duration_ms = 0
         title: str | None = None
         artist: str | None = None
         album: str | None = None
@@ -318,6 +319,11 @@ class AdbTcpClient:
                 pos_match = re.search(r'position=(\d+)', line)
                 if pos_match:
                     position_ms = int(pos_match.group(1))
+                
+                # Parse duration if available (some media sessions include it)
+                dur_match = re.search(r'duration=(\d+)', line)
+                if dur_match:
+                    duration_ms = int(dur_match.group(1))
             
             # Parse metadata
             # Format: metadata: size=5, description=Title, Artist, Album
@@ -345,7 +351,7 @@ class AdbTcpClient:
             package_name=package_name,
             playback_state=playback_state,
             position_ms=position_ms,
-            duration_ms=0,  # Duration not available in dumpsys output
+            duration_ms=duration_ms,
         )
 
     def has_tv_input_support(self) -> bool:
