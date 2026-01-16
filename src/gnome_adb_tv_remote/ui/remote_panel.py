@@ -348,7 +348,7 @@ class RemotePanel(Gtk.Box):
                 shortcut_text = get_action_tooltip("dpad-center", settings)
                 
                 if shortcut_text:
-                    btn.set_tooltip_text(f"OK / Select: {shortcut_text}")
+                    btn.set_tooltip_text(f"OK/Select: {shortcut_text}")
                     self._cached_shortcuts["dpad-center"] = shortcut_text
                 
                 if keycode in self._keycode_shortcut_labels:

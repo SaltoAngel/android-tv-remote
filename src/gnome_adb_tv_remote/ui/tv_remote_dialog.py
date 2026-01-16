@@ -172,7 +172,7 @@ class TvRemoteDialog(Adw.Window):
             "KEYCODE_DPAD_DOWN": "Down",
             "KEYCODE_DPAD_LEFT": "Left",
             "KEYCODE_DPAD_RIGHT": "Right",
-            "KEYCODE_DPAD_CENTER": "OK / Select",
+            "KEYCODE_DPAD_CENTER": "OK/Select",
         }
         
         for keycode, button in self._keycode_buttons.items():

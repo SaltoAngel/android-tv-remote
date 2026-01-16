@@ -78,7 +78,7 @@ ACTION_LABELS: dict[str, str] = {
     "dpad-down": "Down",
     "dpad-left": "Left",
     "dpad-right": "Right",
-    "dpad-center": "OK / Select",
+    "dpad-center": "OK/Select",
     "back": "Back",
     "home": "Home",
     "menu": "Menu",

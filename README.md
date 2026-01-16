@@ -34,7 +34,7 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 | Key | Action |
 | --- | --- |
 | Arrow Keys / W A S D | Navigate (Up/Down/Left/Right) |
-| Enter / E | OK / Select |
+| Enter / E | OK/Select |
 | Esc / Q | Back |
 | H | Home |
 | I | Menu |
