@@ -52,8 +52,6 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 | F | Search (YouTube) |
 | K | Focus Keyboard |
 | N | Notifications |
-| Ctrl+Tab | App Switcher (switch between recent apps) |
-| Ctrl+A | App Launcher (view all installed apps) |
 
 ## Installation
 
