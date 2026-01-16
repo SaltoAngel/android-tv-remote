@@ -213,31 +213,27 @@ class RemotePanel(Gtk.Box):
         # Cache for shortcuts to persist them when tooltips are updated dynamically
         self._cached_shortcuts: dict[str, str] = {}
 
-        # D-pad
+        # D-pad (rows 0-2)
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
         self._add_key_button("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="keyboard_arrow_left-symbolic.svg")
         self._add_key_button("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name="fiber_manual_record-symbolic.svg")
         self._add_key_button("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="keyboard_arrow_right-symbolic.svg")
         self._add_key_button("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="keyboard_arrow_down-symbolic.svg")
 
-        # System
+        # Row 3: Back, Home, Apps
         self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
         self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 3, icon_name="view-list-symbolic")
+        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 3, icon_name="view-app-grid-symbolic")
 
-        # System - Row 4: Apps, Search, Assistant
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 0, 4, icon_name="view-app-grid-symbolic")
-        self._add_search_button(1, 4, icon_name="system-search-symbolic")
-        self._add_key_button("Assistant", "KEYCODE_ASSIST", 2, 4, icon_name="audio-input-microphone-symbolic")
-        
-        # Row 5: Subtitles, Notifications, Input
+        # Row 4: Find, Assistant, Menu
+        self._add_search_button(0, 4, icon_name="system-search-symbolic")
+        self._add_key_button("Assistant", "KEYCODE_ASSIST", 1, 4, icon_name="audio-input-microphone-symbolic")
+        self._add_key_button("Menu", "KEYCODE_MENU", 2, 4, icon_name="view-list-symbolic")
+
+        # Row 5: Subtitles, Input, Notifications
         self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 0, 5, icon_name="media-view-subtitles-symbolic")
-        self._add_notifications_button(1, 5, icon_name="preferences-system-notifications-symbolic")
-        self._add_key_button("Input", "KEYCODE_TV_INPUT", 2, 5, icon_name="video-display-symbolic")
-        
-        
-        # Media Controls Section (above keyboard)
-        self._create_media_controls_section()
+        self._add_key_button("Input", "KEYCODE_TV_INPUT", 1, 5, icon_name="video-display-symbolic")
+        self._add_notifications_button(2, 5, icon_name="preferences-system-notifications-symbolic")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
@@ -254,6 +250,9 @@ class RemotePanel(Gtk.Box):
         self._keyboard_entry.add_controller(focus_controller)
         
         self.append(self._keyboard_entry)
+        
+        # Media Controls Section (now playing bar + player/volume controls at bottom)
+        self._create_media_controls_section()
 
     def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None, on_notifications=None) -> None:
         self._on_keyevent = on_keyevent
@@ -263,10 +262,7 @@ class RemotePanel(Gtk.Box):
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
-        from .preferences_dialog import get_action_tooltip, DEFAULT_SHORTCUTS, _load_shortcuts_dict
-
-        # Load current shortcuts to compare with defaults
-        current_shortcuts = _load_shortcuts_dict(settings)
+        from .preferences_dialog import get_action_tooltip
 
         # Mapping from keycode to action for direction buttons
         direction_keycodes = {
@@ -283,7 +279,7 @@ class RemotePanel(Gtk.Box):
             "KEYCODE_DPAD_LEFT": "Left",
             "KEYCODE_DPAD_RIGHT": "Right",
         }
-        
+
         # Updated mapping for tooltip lookup including media keys
         tooltip_action_map = {
             **KEYCODE_TO_ACTION,
@@ -298,7 +294,7 @@ class RemotePanel(Gtk.Box):
         for keycode, btn in self._keycode_buttons.items():
             action = tooltip_action_map.get(keycode)
             
-            # Special handling for direction buttons: only show if changed from default
+            # Special handling for direction buttons
             if keycode in direction_keycodes:
                 action = direction_keycodes[keycode]
                 
@@ -730,61 +726,12 @@ class RemotePanel(Gtk.Box):
         return btn
 
     def _create_media_controls_section(self) -> None:
-        """Create the media controls section with playback buttons, volume, and now playing."""
+        """Create the media controls section with now playing bar and playback/volume controls."""
         # Main container for media controls section
         section_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         section_box.add_css_class("media-controls-section")
         
-        # Single row: Media buttons (left) + Volume slider (center) + Mute button (right)
-        controls_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        controls_row.add_css_class("volume-slider-box")
-        controls_row.set_hexpand(True)
-        
-        # Left side: Prev, Play/Pause, Next buttons
-        # Prev button
-        prev_btn = self._create_media_button("Prev", "KEYCODE_MEDIA_PREVIOUS", "media-skip-backward-symbolic")
-        controls_row.append(prev_btn)
-        
-        # Play/Pause button
-        play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", ["media-playback-start-symbolic", "media-playback-pause-symbolic"])
-        controls_row.append(play_btn)
-        
-        # Next button
-        next_btn = self._create_media_button("Next", "KEYCODE_MEDIA_NEXT", "media-skip-forward-symbolic")
-        controls_row.append(next_btn)
-        
-        # Center: Volume slider
-        adjustment = Gtk.Adjustment(value=0, lower=0, upper=15, step_increment=1, page_increment=1)
-        slider = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adjustment)
-        slider.set_hexpand(True)
-        slider.set_draw_value(False)
-        slider.set_tooltip_text("Volume")
-        slider.connect("value-changed", self._on_slider_changed)
-        
-        # Add click gesture to allow clicking directly on the slider track
-        click_gesture = Gtk.GestureClick()
-        click_gesture.connect("released", self._on_slider_clicked)
-        slider.add_controller(click_gesture)
-        
-        controls_row.append(slider)
-        self._volume_slider = slider
-        
-        # Right side: Mute button
-        mute_btn = Gtk.Button()
-        mute_btn.add_css_class("volume-mute-button")
-        mute_btn.set_tooltip_text("Mute")
-        mute_btn.connect("clicked", self._on_mute_clicked)
-        
-        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
-        mute_icon.set_pixel_size(24)
-        mute_btn.set_child(mute_icon)
-        controls_row.append(mute_btn)
-        self._mute_button = mute_btn
-        self._keycode_buttons["KEYCODE_VOLUME_MUTE"] = mute_btn
-        
-        section_box.append(controls_row)
-        
-        # Row 3: Now Playing widget
+        # First: Now Playing widget (shows current media)
         self._now_playing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._now_playing_box.add_css_class("now-playing-box")
         self._now_playing_box.set_hexpand(True)
@@ -820,7 +767,53 @@ class RemotePanel(Gtk.Box):
         
         section_box.append(self._now_playing_box)
         
-        # Add section to main panel (before keyboard)
+        # Second: Player controls row (Prev, Play/Pause, Next) + Volume slider + Mute button
+        controls_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        controls_row.add_css_class("volume-slider-box")
+        controls_row.set_hexpand(True)
+        
+        # Left side: Prev, Play/Pause, Next buttons
+        prev_btn = self._create_media_button("Prev", "KEYCODE_MEDIA_PREVIOUS", "media-skip-backward-symbolic")
+        controls_row.append(prev_btn)
+        
+        play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", ["media-playback-start-symbolic", "media-playback-pause-symbolic"])
+        controls_row.append(play_btn)
+        
+        next_btn = self._create_media_button("Next", "KEYCODE_MEDIA_NEXT", "media-skip-forward-symbolic")
+        controls_row.append(next_btn)
+        
+        # Center: Volume slider
+        adjustment = Gtk.Adjustment(value=0, lower=0, upper=15, step_increment=1, page_increment=1)
+        slider = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adjustment)
+        slider.set_hexpand(True)
+        slider.set_draw_value(False)
+        slider.set_tooltip_text("Volume")
+        slider.connect("value-changed", self._on_slider_changed)
+        
+        # Add click gesture to allow clicking directly on the slider track
+        click_gesture = Gtk.GestureClick()
+        click_gesture.connect("released", self._on_slider_clicked)
+        slider.add_controller(click_gesture)
+        
+        controls_row.append(slider)
+        self._volume_slider = slider
+        
+        # Right side: Mute button
+        mute_btn = Gtk.Button()
+        mute_btn.add_css_class("volume-mute-button")
+        mute_btn.set_tooltip_text("Mute")
+        mute_btn.connect("clicked", self._on_mute_clicked)
+        
+        mute_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
+        mute_icon.set_pixel_size(24)
+        mute_btn.set_child(mute_icon)
+        controls_row.append(mute_btn)
+        self._mute_button = mute_btn
+        self._keycode_buttons["KEYCODE_VOLUME_MUTE"] = mute_btn
+        
+        section_box.append(controls_row)
+        
+        # Add section to main panel (at bottom)
         self.append(section_box)
 
     def _create_media_button(self, label: str, keycode: str, icon_name: str | list[str]) -> Gtk.Button:
