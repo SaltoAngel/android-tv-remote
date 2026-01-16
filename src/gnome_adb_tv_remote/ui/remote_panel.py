@@ -87,29 +87,50 @@ button.remote-button label.caption {
 }
 
 .now-playing-box {
-    padding: 8px 12px;
-    margin-top: 8px;
-    border-radius: 8px;
-    background: alpha(@accent_bg_color, 0.15);
+    padding: 16px;
+    margin: 4px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    background-image: linear-gradient(135deg, alpha(@accent_bg_color, 0.2), alpha(@accent_bg_color, 0.05));
+    border: 1px solid alpha(@accent_color, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .now-playing-box:backdrop {
-    background: alpha(@window_bg_color, 0.3);
+    background-image: none;
+    background-color: alpha(@window_bg_color, 0.5);
+    box-shadow: none;
 }
 
 .now-playing-title {
-    font-weight: bold;
-    font-size: 1.0em;
+    font-weight: 800;
+    font-size: 1.1em;
+    color: @accent_color;
+    margin-bottom: 2px;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.1);
 }
 
 .now-playing-artist {
-    opacity: 0.8;
-    font-size: 0.9em;
+    opacity: 0.9;
+    font-size: 0.95em;
+    font-weight: 500;
 }
 
 .now-playing-status {
-    opacity: 0.6;
-    font-size: 0.85em;
+    opacity: 0.7;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.now-playing-icon {
+    opacity: 0.9;
+    color: @accent_color;
+    background: alpha(@accent_color, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+    margin-right: 4px;
 }
 
 .input-button-dimmed {
@@ -744,7 +765,13 @@ class RemotePanel(Gtk.Box):
         self._now_playing_box.add_css_class("now-playing-box")
         self._now_playing_box.set_hexpand(True)
         
-        # Text container (icon removed - Play/Pause button shows state)
+        # Album art placeholder icon
+        icon = Gtk.Image.new_from_icon_name("audio-x-generic-symbolic")
+        icon.set_pixel_size(32)
+        icon.add_css_class("now-playing-icon")
+        self._now_playing_box.append(icon)
+        
+        # Text container
         text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         text_box.set_valign(Gtk.Align.CENTER)
         text_box.set_hexpand(True)
