@@ -269,8 +269,8 @@ class MainWindow(Adw.ApplicationWindow):
         """Attempt to connect to IP, falling back to IP discovery on failure.
         
         This is used for auto-connect on startup. If the saved IP is no longer
-        reachable, we scan the network to find paired devices that may have
-        changed IP addresses.
+        reachable or a different device is at that IP, we scan the network to
+        find paired devices that may have changed IP addresses.
         """
         if not ip:
             return
@@ -282,6 +282,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._remote_panel.set_connection_status("Connecting…")
         client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
         
+        # Get expected device model from settings
+        expected_model = self._settings.get_string("last-connected-device-model") or None
+        
         def worker() -> None:
             try:
                 try:
@@ -289,6 +292,19 @@ class MainWindow(Adw.ApplicationWindow):
                     device_info = client.get_device_info()
                 except (AdbAuthRequiredError, AdbConnectError, Exception):
                     # Connection failed - start IP discovery in background
+                    GLib.idle_add(self._on_auto_connect_failed_start_discovery)
+                    return
+                
+                # Verify device model matches expected device
+                if expected_model and device_info.model != expected_model:
+                    logger.info(
+                        f"Device model mismatch: expected '{expected_model}', "
+                        f"got '{device_info.model}'. Starting discovery."
+                    )
+                    try:
+                        client.disconnect()
+                    except Exception:
+                        pass
                     GLib.idle_add(self._on_auto_connect_failed_start_discovery)
                     return
                 
@@ -320,11 +336,11 @@ class MainWindow(Adw.ApplicationWindow):
         1. Scans for devices with ADB port open
         2. Checks which ones are paired using is_paired_silent
         3. Gets device info for paired devices
-        4. Matches device names with stored discovered-devices
+        4. Matches device models with stored settings
         5. Updates both last-connected-ip and tv-ip if their devices are found
         6. Attempts to connect to the previously saved device
         """
-        # Load stored device info
+        # Load stored device info for updating IP-to-model mapping
         stored_devices_json = self._settings.get_string("discovered-devices")
         stored_devices: list[dict] = []
         try:
@@ -333,22 +349,12 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception:
             pass
         
-        # Get last connected device's model (if we have it stored)
+        # Get device models directly from settings
         last_ip = self._settings.get_string("last-connected-ip")
-        last_device_model: str | None = None
-        for dev in stored_devices:
-            if dev.get("ip") == last_ip:
-                last_device_model = dev.get("model")
-                break
+        last_device_model = self._settings.get_string("last-connected-device-model") or None
         
-        # Get TV IP device's model (if we have it stored)
         tv_ip = self._settings.get_string("tv-ip")
-        tv_device_model: str | None = None
-        if tv_ip:
-            for dev in stored_devices:
-                if dev.get("ip") == tv_ip:
-                    tv_device_model = dev.get("model")
-                    break
+        tv_device_model = self._settings.get_string("tv-device-model") or None
         
         # Get networks to scan
         nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
@@ -463,7 +469,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         # If we found the last connected device at a new IP, update and connect
         if new_ip_for_last_device and new_ip_for_last_device != last_ip:
-            GLib.idle_add(self._save_last_ip, new_ip_for_last_device)
+            GLib.idle_add(self._save_last_device, new_ip_for_last_device)
             GLib.idle_add(self._on_discovery_complete, new_ip_for_last_device, new_ip_for_tv_device, None)
         elif paired_devices:
             # Connect to first available paired device
@@ -493,9 +499,17 @@ class MainWindow(Adw.ApplicationWindow):
             logger.info(f"IP discovery found device at {found_ip}, connecting...")
             self._connect_ip(found_ip, silent=False)
 
-    def _save_last_ip(self, ip: str) -> None:
-        """Save the successfully connected IP address to settings."""
+    def _save_last_device(self, ip: str, device_info: DeviceInfo | None = None) -> None:
+        """Save the successfully connected device info to settings.
+        
+        Args:
+            ip: The device's IP address.
+            device_info: Optional device info to save name and model.
+        """
         self._settings.set_string("last-connected-ip", ip)
+        if device_info:
+            self._settings.set_string("last-connected-device-name", device_info.manufacturer or "")
+            self._settings.set_string("last-connected-device-model", device_info.model or "")
         return False  # For GLib.idle_add compatibility
 
     def _create_actions(self) -> None:
@@ -603,7 +617,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._adb = client
         self._set_connected(True, ip=ip)
         self._remote_panel.update_device_info(device_info, ip)
-        self._save_last_ip(ip)
+        self._save_last_device(ip, device_info)
         if not self._connect_silent:
             self._toast(f"Successfully connected to {ip}!")
         self._connect_silent = False
@@ -1071,6 +1085,9 @@ class MainWindow(Adw.ApplicationWindow):
         This establishes a second scrcpy connection to the TV device specified
         in settings, enabling faster Input button operations.
         """
+        # Get expected TV device model for verification
+        expected_tv_model = self._settings.get_string("tv-device-model") or None
+        
         def worker():
             try:
                 # Create ADB client for TV device
@@ -1079,6 +1096,19 @@ class MainWindow(Adw.ApplicationWindow):
                 
                 # Get device info for display in dialog
                 tv_device_info = tv_client.get_device_info()
+                
+                # Verify device model matches expected TV device
+                if expected_tv_model and tv_device_info.model != expected_tv_model:
+                    logger.info(
+                        f"TV device model mismatch: expected '{expected_tv_model}', "
+                        f"got '{tv_device_info.model}'. Starting discovery."
+                    )
+                    try:
+                        tv_client.disconnect()
+                    except Exception:
+                        pass
+                    GLib.idle_add(self._on_tv_scrcpy_failed)
+                    return
                 
                 # Create scrcpy controller for TV
                 tv_scrcpy = ScrcpyServerController(tv_client)
@@ -1108,6 +1138,11 @@ class MainWindow(Adw.ApplicationWindow):
             device_name = tv_adb.host
         self._remote_panel.set_input_button_tooltip(f"Input ({device_name})")
         logger.info(f"TV scrcpy connected to {tv_adb.host} ({device_name}) - Input button will use fast connection")
+        
+        # Save TV device info to settings
+        if tv_device_info:
+            self._settings.set_string("tv-device-name", tv_device_info.manufacturer or "")
+            self._settings.set_string("tv-device-model", tv_device_info.model or "")
         
         # Store TV device model info to discovered-devices for future IP discovery
         if tv_device_info and tv_device_info.model:

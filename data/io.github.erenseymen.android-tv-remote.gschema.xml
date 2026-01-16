@@ -33,6 +33,26 @@
       <summary>TV IP address for Input button routing</summary>
       <description>IP address of the TV device. When configured, Input button commands will be sent to this TV instead of the connected device (useful for devices like Mi Box that don't support Input button).</description>
     </key>
+    <key name="last-connected-device-name" type="s">
+      <default>''</default>
+      <summary>Last connected device name</summary>
+      <description>The manufacturer name of the last successfully connected device. Used for verification during auto-connect.</description>
+    </key>
+    <key name="last-connected-device-model" type="s">
+      <default>''</default>
+      <summary>Last connected device model</summary>
+      <description>The model name of the last successfully connected device. Used for verification during auto-connect.</description>
+    </key>
+    <key name="tv-device-name" type="s">
+      <default>''</default>
+      <summary>TV device name</summary>
+      <description>The manufacturer name of the TV device for Input button routing.</description>
+    </key>
+    <key name="tv-device-model" type="s">
+      <default>''</default>
+      <summary>TV device model</summary>
+      <description>The model name of the TV device for Input button routing. Used for verification during auto-connect.</description>
+    </key>
   </schema>
 </schemalist>
 
