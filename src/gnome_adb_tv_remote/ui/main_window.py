@@ -882,6 +882,17 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             scrcpy.send_keycode(keycode)
             
+            # Optimistically update Play/Pause state in UI and MPRIS
+            if keycode == "KEYCODE_MEDIA_PLAY_PAUSE":
+                current = self._mpris._playback_status
+                new_status = "Paused" if current == "Playing" else "Playing"
+                self._mpris.set_playback_status(new_status)
+                self._remote_panel.update_now_playing(
+                    title=self._mpris._track_title,
+                    artist=self._mpris._track_artist,
+                    playback_status=new_status,
+                )
+            
             # Update volume state in UI when volume keys are pressed
             if keycode == "KEYCODE_VOLUME_MUTE":
                 self._remote_panel.toggle_mute()
