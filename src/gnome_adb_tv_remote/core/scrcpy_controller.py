@@ -419,6 +419,59 @@ class ScrcpyServerController:
         self._send_key_event(keycode, AKEY_EVENT_ACTION_DOWN)
         self._send_key_event(keycode, AKEY_EVENT_ACTION_UP)
 
+    def send_key_down(self, keycode_name: str) -> None:
+        """
+        Send only a key down event to the device.
+        
+        Used for long-press functionality - call send_key_up after desired delay.
+
+        Args:
+            keycode_name: Android keycode name (e.g., "KEYCODE_DPAD_CENTER")
+        """
+        keycode = AKEYCODE_MAP.get(keycode_name)
+        if keycode is None:
+            logger.warning(f"Unknown keycode: {keycode_name}")
+            return
+        self._send_key_event(keycode, AKEY_EVENT_ACTION_DOWN)
+
+    def send_key_up(self, keycode_name: str) -> None:
+        """
+        Send only a key up event to the device.
+        
+        Used to complete a long-press started with send_key_down.
+
+        Args:
+            keycode_name: Android keycode name (e.g., "KEYCODE_DPAD_CENTER")
+        """
+        keycode = AKEYCODE_MAP.get(keycode_name)
+        if keycode is None:
+            logger.warning(f"Unknown keycode: {keycode_name}")
+            return
+        self._send_key_event(keycode, AKEY_EVENT_ACTION_UP)
+
+    def send_long_press(self, keycode_name: str, duration_ms: int = 600) -> None:
+        """
+        Send a long-press event to the device.
+        
+        This sends key down, waits for the specified duration, then sends key up.
+        Android typically recognizes a long-press after ~500ms.
+        
+        Note: This is a blocking call. For non-blocking long-press, use
+        send_key_down followed by a delayed send_key_up in your application.
+
+        Args:
+            keycode_name: Android keycode name (e.g., "KEYCODE_DPAD_CENTER")
+            duration_ms: How long to hold the key, in milliseconds (default 600ms)
+        """
+        keycode = AKEYCODE_MAP.get(keycode_name)
+        if keycode is None:
+            logger.warning(f"Unknown keycode: {keycode_name}")
+            return
+        
+        self._send_key_event(keycode, AKEY_EVENT_ACTION_DOWN)
+        time.sleep(duration_ms / 1000.0)
+        self._send_key_event(keycode, AKEY_EVENT_ACTION_UP)
+
     def _send_key_event(self, keycode: int, action: int) -> None:
         """Send a key event control message."""
         if not self._connected or not self._control_socket:

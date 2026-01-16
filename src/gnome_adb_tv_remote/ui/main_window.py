@@ -122,12 +122,20 @@ class MainWindow(Adw.ApplicationWindow):
             on_text=self._on_remote_text,
             on_volume_change=self._on_volume_change,
             on_notifications=self._on_notifications,
+            on_long_press=self._on_remote_long_press,
         )
         
         # Track current volume for slider changes
         self._current_volume: int = 0
         self._last_volume_change_time: float = 0.0
         self._volume_refresh_timeout_id: int | None = None  # For debounced volume refresh
+        
+        # Keyboard long-press state (for shortcuts)
+        self._kb_long_press_timer_id: int | None = None
+        self._kb_long_press_keyval: int | None = None
+        self._kb_long_press_keycode: str | None = None
+        self._kb_long_press_triggered: bool = False
+        
         self._remote_panel.update_tooltips(self._settings)
         # Update Power button tooltip
         self.reload_shortcuts()
@@ -197,10 +205,22 @@ class MainWindow(Adw.ApplicationWindow):
         info_btn.connect("clicked", self._on_info_clicked)
         header.pack_start(info_btn)
 
-        # Power button in header bar
+        # Power button in header bar with long-press support
         self._power_button = Gtk.Button(icon_name="system-shutdown-symbolic")
         self._power_button.add_css_class("power-button")
-        self._power_button.connect("clicked", lambda *_: self._on_remote_keyevent("KEYCODE_POWER"))
+        
+        # Add long-press gesture for power menu
+        power_gesture = Gtk.GestureClick()
+        power_gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        power_gesture.connect("pressed", self._on_power_button_pressed)
+        power_gesture.connect("released", self._on_power_button_released)
+        power_gesture.connect("unpaired-release", self._on_power_button_unpaired_release)
+        self._power_button.add_controller(power_gesture)
+        
+        # Long-press state for power button
+        self._power_long_press_timer_id: int | None = None
+        self._power_long_press_triggered: bool = False
+        
         header.pack_start(self._power_button)
 
         # Apply CSS for power button hover effect (red on hover)
@@ -232,6 +252,7 @@ class MainWindow(Adw.ApplicationWindow):
         key_controller = Gtk.EventControllerKey()
         key_controller.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_controller.connect("key-pressed", self._on_key_pressed)
+        key_controller.connect("key-released", self._on_key_released)
         self.add_controller(key_controller)
 
         self._set_connected(False)
@@ -789,10 +810,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._toast("Disconnected from device.")
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
-        """Handle global keyboard shortcuts."""
+        """Handle global keyboard shortcuts with long-press support.
+        
+        For most shortcuts (except D-pad directions), we start a timer on key-press.
+        If the key is released before 500ms, it's a normal short press.
+        If held for 500ms+, it triggers a long-press action.
+        """
         # Prepare lower-case keyval for fallback (handling Caps Lock)
         lower_keyval = Gdk.keyval_to_lower(keyval)
-
 
         # Ignore keyboard shortcuts if scrcpy is not ready
         scrcpy = self._scrcpy
@@ -813,30 +838,29 @@ class MainWindow(Adw.ApplicationWindow):
         if focus and isinstance(focus, (Gtk.Editable, Gtk.Entry)):
             return False
 
-        # Handle focus keyboard shortcut (configurable)
+        # Handle focus keyboard shortcut (configurable) - no long-press needed
         if keyval in self._focus_keyboard_keys or lower_keyval in self._focus_keyboard_keys:
             self._remote_panel.focus_keyboard()
             return True
 
-        # Handle search shortcut (sends text "s" for YouTube search, then activates keyboard)
+        # Handle search shortcut (sends text "s" for YouTube search, then activates keyboard) - no long-press
         if keyval in self._search_keys or lower_keyval in self._search_keys:
             self._on_remote_text("s")
             self._remote_panel.focus_keyboard()
             return True
 
-        # Handle notifications shortcut (opens notification panel)
+        # Handle notifications shortcut (opens notification panel) - no long-press needed
         if keyval in self._notifications_keys or lower_keyval in self._notifications_keys:
             self._remote_panel.flash_notifications_button()
             self._on_notifications()
             return True
 
-        # Handle TV Input shortcut (T key)
-        # Skip if TV scrcpy is required but not yet connected
+        # Handle TV Input shortcut (T key) - uses long-press support
         if keyval in (Gdk.KEY_t, Gdk.KEY_T):
             if self._tv_scrcpy_required:
                 return True  # Ignore keypress while TV scrcpy is connecting
-            self._remote_panel.flash_button("KEYCODE_TV_INPUT")
-            self._on_remote_keyevent("KEYCODE_TV_INPUT")
+            # Start long-press timer for TV Input
+            self._start_kb_long_press_timer(keyval, "KEYCODE_TV_INPUT")
             return True
 
         # Handle keyboard shortcuts
@@ -844,13 +868,94 @@ class MainWindow(Adw.ApplicationWindow):
         keycode = self._key_map.get(keyval) or self._key_map.get(lower_keyval)
 
         if keycode:
-            # Flash the button to show visual feedback
-            self._remote_panel.flash_button(keycode)
-            # Send the key event
-            self._on_remote_keyevent(keycode)
-            # Return True to stop event propagation (prevent default behavior)
+            # D-pad directions: send immediately (they have their own repeat behavior)
+            if keycode in ("KEYCODE_DPAD_UP", "KEYCODE_DPAD_DOWN", "KEYCODE_DPAD_LEFT", "KEYCODE_DPAD_RIGHT"):
+                self._remote_panel.flash_button(keycode)
+                self._on_remote_keyevent(keycode)
+                return True
+            
+            # All other keycodes: start long-press timer
+            self._start_kb_long_press_timer(keyval, keycode)
             return True
         return False
+    
+    def _start_kb_long_press_timer(self, keyval: int, keycode: str) -> None:
+        """Start the keyboard long-press timer for a key.
+        
+        If the same key is already being tracked (auto-repeat), don't restart the timer.
+        """
+        lower_keyval = Gdk.keyval_to_lower(keyval)
+        
+        # If we're already tracking this same key, don't restart timer (auto-repeat)
+        if self._kb_long_press_keyval is not None:
+            tracked_lower = Gdk.keyval_to_lower(self._kb_long_press_keyval)
+            if lower_keyval == tracked_lower:
+                # Same key, ignore auto-repeat
+                return
+        
+        # Stop any existing timer for different key
+        self._stop_kb_long_press_timer()
+        
+        # Store state
+        self._kb_long_press_keyval = keyval
+        self._kb_long_press_keycode = keycode
+        self._kb_long_press_triggered = False
+        
+        # Start timer (500ms for long-press)
+        self._kb_long_press_timer_id = GLib.timeout_add(500, self._on_kb_long_press_fired)
+    
+    def _on_kb_long_press_fired(self) -> bool:
+        """Called when keyboard long-press timer fires (500ms held)."""
+        self._kb_long_press_triggered = True
+        
+        if self._kb_long_press_keycode:
+            # Flash button and send long-press
+            self._remote_panel.flash_button(self._kb_long_press_keycode)
+            self._on_remote_long_press(self._kb_long_press_keycode)
+        
+        self._kb_long_press_timer_id = None
+        return False  # Don't repeat
+    
+    def _stop_kb_long_press_timer(self) -> None:
+        """Stop the keyboard long-press timer and clear state."""
+        if self._kb_long_press_timer_id is not None:
+            GLib.source_remove(self._kb_long_press_timer_id)
+            self._kb_long_press_timer_id = None
+    
+    def _on_key_released(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> None:
+        """Handle key release for long-press detection.
+        
+        If the key was released before the long-press timer fired,
+        send the normal keyevent. If long-press was already triggered,
+        do nothing (the long-press callback already handled it).
+        """
+        lower_keyval = Gdk.keyval_to_lower(keyval)
+        
+        # Check if this is the key we're tracking for long-press
+        if self._kb_long_press_keyval is None:
+            return
+        
+        # Match either original or lower-case keyval
+        if keyval != self._kb_long_press_keyval and lower_keyval != Gdk.keyval_to_lower(self._kb_long_press_keyval):
+            return
+        
+        keycode = self._kb_long_press_keycode
+        was_triggered = self._kb_long_press_triggered
+        
+        # Stop timer and clear state
+        self._stop_kb_long_press_timer()
+        self._kb_long_press_keyval = None
+        self._kb_long_press_keycode = None
+        self._kb_long_press_triggered = False
+        
+        # If long-press was already triggered, don't send normal keyevent
+        if was_triggered:
+            return
+        
+        # Short press - send normal keyevent
+        if keycode:
+            self._remote_panel.flash_button(keycode)
+            self._on_remote_keyevent(keycode)
 
     def _on_remote_keyevent(self, keycode: str) -> None:
         """Send a key event to the device using scrcpy-server.
@@ -909,6 +1014,62 @@ class MainWindow(Adw.ApplicationWindow):
         except Exception as e:
             logger.error(f"scrcpy keyevent failed: {e}")
             self._toast("Failed to send command to TV.")
+
+    def _on_remote_long_press(self, keycode: str) -> None:
+        """Send a long-press event to the device using scrcpy-server.
+        
+        This is used for the OK/Enter button to trigger context menus on Android TV.
+        For example, long-pressing on an app in the app drawer opens the app options menu.
+        
+        The long-press is sent in a background thread to avoid blocking the UI.
+        """
+        scrcpy = self._scrcpy
+        if not scrcpy or not scrcpy.connected:
+            self._toast("Device is not connected.")
+            return
+
+        def worker():
+            try:
+                # Send long-press (600ms hold time for reliable detection)
+                scrcpy.send_long_press(keycode, duration_ms=600)
+                logger.debug(f"Long-press sent: {keycode}")
+            except Exception as e:
+                logger.error(f"scrcpy long-press failed: {e}")
+                GLib.idle_add(self._toast, "Failed to send long-press to TV.")
+        
+        # Run in background thread to avoid UI freeze
+        threading.Thread(target=worker, name="long-press", daemon=True).start()
+
+    def _on_power_button_pressed(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """Handle power button press - start long-press timer."""
+        self._stop_power_long_press_timer()
+        self._power_long_press_triggered = False
+        self._power_long_press_timer_id = GLib.timeout_add(500, self._on_power_long_press_fired)
+    
+    def _on_power_button_released(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float) -> None:
+        """Handle power button release."""
+        if not self._power_long_press_triggered:
+            # Normal short press - send power keycode
+            self._on_remote_keyevent("KEYCODE_POWER")
+        self._stop_power_long_press_timer()
+    
+    def _on_power_button_unpaired_release(self, gesture: Gtk.GestureClick, x: float, y: float, button: int, sequence) -> None:
+        """Handle unpaired release of power button."""
+        self._stop_power_long_press_timer()
+    
+    def _on_power_long_press_fired(self) -> bool:
+        """Called when power button long-press timer fires (500ms held)."""
+        self._power_long_press_triggered = True
+        self._on_remote_long_press("KEYCODE_POWER")
+        self._power_long_press_timer_id = None
+        return False
+    
+    def _stop_power_long_press_timer(self) -> None:
+        """Stop the power button long-press timer."""
+        if self._power_long_press_timer_id is not None:
+            GLib.source_remove(self._power_long_press_timer_id)
+            self._power_long_press_timer_id = None
+        self._power_long_press_triggered = False
 
     def _on_remote_text(self, text: str) -> None:
         """Send text input to the device using scrcpy-server.

@@ -246,27 +246,33 @@ class RemotePanel(Gtk.Box):
         # Key repeat timer for mouse hold-to-repeat on D-pad buttons
         self._key_repeat_timer_id: int | None = None
         self._key_repeat_keycode: str | None = None
+        
+        # Long-press timer and state for OK/Enter button
+        self._long_press_timer_id: int | None = None
+        self._long_press_keycode: str | None = None
+        self._long_press_triggered: bool = False
+        self._on_long_press = None  # Callback for long-press events
 
         # D-pad (rows 0-2) - these support hold-to-repeat for fast seeking
         self._add_key_button_with_repeat("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
         self._add_key_button_with_repeat("Left", "KEYCODE_DPAD_LEFT", 0, 1, icon_name="keyboard_arrow_left-symbolic.svg")
-        self._add_key_button("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name="fiber_manual_record-symbolic.svg")
+        self._add_key_button_with_long_press("Enter", "KEYCODE_DPAD_CENTER", 1, 1, icon_name="fiber_manual_record-symbolic.svg")
         self._add_key_button_with_repeat("Right", "KEYCODE_DPAD_RIGHT", 2, 1, icon_name="keyboard_arrow_right-symbolic.svg")
         self._add_key_button_with_repeat("Down", "KEYCODE_DPAD_DOWN", 1, 2, icon_name="keyboard_arrow_down-symbolic.svg")
 
-        # Row 3: Back, Home, Apps
-        self._add_key_button("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
-        self._add_key_button("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
-        self._add_key_button("Apps", "KEYCODE_ALL_APPS", 2, 3, icon_name="view-app-grid-symbolic")
+        # Row 3: Back, Home, Apps - all support long-press
+        self._add_key_button_with_long_press("Back", "KEYCODE_BACK", 0, 3, icon_name="edit-undo-symbolic")
+        self._add_key_button_with_long_press("Home", "KEYCODE_HOME", 1, 3, icon_name="user-home-symbolic")
+        self._add_key_button_with_long_press("Apps", "KEYCODE_ALL_APPS", 2, 3, icon_name="view-app-grid-symbolic")
 
-        # Row 4: Find, Assistant, Menu
+        # Row 4: Find, Assistant, Menu - all support long-press
         self._add_search_button(0, 4, icon_name="system-search-symbolic")
-        self._add_key_button("Assistant", "KEYCODE_ASSIST", 1, 4, icon_name="audio-input-microphone-symbolic")
-        self._add_key_button("Menu", "KEYCODE_MENU", 2, 4, icon_name="view-list-symbolic")
+        self._add_key_button_with_long_press("Assistant", "KEYCODE_ASSIST", 1, 4, icon_name="audio-input-microphone-symbolic")
+        self._add_key_button_with_long_press("Menu", "KEYCODE_MENU", 2, 4, icon_name="view-list-symbolic")
 
-        # Row 5: Subtitles, Input, Notifications
-        self._add_key_button("Subtitles", "KEYCODE_CAPTIONS", 0, 5, icon_name="media-view-subtitles-symbolic")
-        self._add_key_button("Input", "KEYCODE_TV_INPUT", 1, 5, icon_name="video-display-symbolic")
+        # Row 5: Subtitles, Input, Notifications - all support long-press
+        self._add_key_button_with_long_press("Subtitles", "KEYCODE_CAPTIONS", 0, 5, icon_name="media-view-subtitles-symbolic")
+        self._add_key_button_with_long_press("Input", "KEYCODE_TV_INPUT", 1, 5, icon_name="video-display-symbolic")
         self._add_notifications_button(2, 5, icon_name="preferences-system-notifications-symbolic")
 
         # Keyboard input area - keystrokes are sent directly to Android TV
@@ -288,11 +294,12 @@ class RemotePanel(Gtk.Box):
         # Media Controls Section (now playing bar + player/volume controls at bottom)
         self._create_media_controls_section()
 
-    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None, on_notifications=None) -> None:
+    def set_handlers(self, *, on_keyevent=None, on_text=None, on_volume_change=None, on_notifications=None, on_long_press=None) -> None:
         self._on_keyevent = on_keyevent
         self._on_text = on_text
         self._on_volume_change = on_volume_change
         self._on_notifications = on_notifications
+        self._on_long_press = on_long_press
 
     def update_tooltips(self, settings: Gio.Settings) -> None:
         """Update button shortcut labels based on current keyboard shortcuts."""
@@ -582,59 +589,6 @@ class RemotePanel(Gtk.Box):
         if self._notifications_button:
             flash_button(self._notifications_button)
 
-    def _add_key_button(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
-        # Create button
-        btn = Gtk.Button()
-        btn.add_css_class("remote-button")
-        # Ensure the buttons are accessible/labelled even if showing icon
-        btn.set_tooltip_text(label)
-        
-        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
-        btn.set_hexpand(True)
-        btn.set_vexpand(True)
-        
-        # Create vertical box for content and shortcut
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        box.set_valign(Gtk.Align.CENTER)
-        box.set_halign(Gtk.Align.CENTER)
-        
-        # Main content (Icon or Label)
-        if icon_name:
-            if isinstance(icon_name, list):
-                icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-                icon_box.set_halign(Gtk.Align.CENTER)
-                for name in icon_name:
-                    image = create_icon(name)
-                    icon_box.append(image)
-                box.append(icon_box)
-            else:
-                image = create_icon(icon_name)
-                box.append(image)
-        else:
-            main_label = Gtk.Label(label=label)
-            # Make text label bold if no icon
-            main_label.set_markup(f"<b>{label}</b>")
-            box.append(main_label)
-        
-        # Shortcut label (bold, same as Enter button)
-        shortcut_label = Gtk.Label()
-        shortcut_label.add_css_class("caption")
-        shortcut_label.set_visible(False)  # Will be shown when shortcuts are loaded
-        # Limit width and enable wrapping for long shortcuts (e.g. "Esc / Q / Backspace")
-        shortcut_label.set_max_width_chars(12)
-        shortcut_label.set_wrap(True)
-        shortcut_label.set_justify(Gtk.Justification.CENTER)
-        box.append(shortcut_label)
-        
-        # Set box as button child
-        btn.set_child(box)
-        
-        self._grid.attach(btn, col, row, 1, 1)
-
-        # Register button and shortcut label for updates
-        self._keycode_buttons[keycode] = btn
-        self._keycode_shortcut_labels[keycode] = shortcut_label
-
     def _add_key_button_with_repeat(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
         """Add a key button that supports hold-to-repeat for mouse input.
         
@@ -742,6 +696,122 @@ class RemotePanel(Gtk.Box):
             GLib.source_remove(self._key_repeat_timer_id)
             self._key_repeat_timer_id = None
         self._key_repeat_keycode = None
+
+    def _add_key_button_with_long_press(self, label: str, keycode: str, col: int, row: int, icon_name: str | list[str] | None = None) -> None:
+        """Add a key button that supports long-press detection.
+        
+        This is used for the OK/Enter button where a long-press (500ms+)
+        triggers a different action (context menu on Android TV).
+        Short presses send the normal keycode.
+        """
+        # Create button
+        btn = Gtk.Button()
+        btn.add_css_class("remote-button")
+        btn.set_tooltip_text(label)
+        btn.set_hexpand(True)
+        btn.set_vexpand(True)
+        
+        # Create vertical box for content and shortcut
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        box.set_valign(Gtk.Align.CENTER)
+        box.set_halign(Gtk.Align.CENTER)
+        
+        # Main content (Icon or Label)
+        if icon_name:
+            if isinstance(icon_name, list):
+                icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+                icon_box.set_halign(Gtk.Align.CENTER)
+                for name in icon_name:
+                    image = create_icon(name)
+                    icon_box.append(image)
+                box.append(icon_box)
+            else:
+                image = create_icon(icon_name)
+                box.append(image)
+        else:
+            main_label = Gtk.Label(label=label)
+            main_label.set_markup(f"<b>{label}</b>")
+            box.append(main_label)
+        
+        # Shortcut label
+        shortcut_label = Gtk.Label()
+        shortcut_label.add_css_class("caption")
+        shortcut_label.set_visible(False)
+        shortcut_label.set_max_width_chars(12)
+        shortcut_label.set_wrap(True)
+        shortcut_label.set_justify(Gtk.Justification.CENTER)
+        box.append(shortcut_label)
+        
+        btn.set_child(box)
+        
+        # Add GestureClick for long-press detection
+        gesture = Gtk.GestureClick()
+        gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        gesture.connect("pressed", self._on_long_press_button_pressed, keycode)
+        gesture.connect("released", self._on_long_press_button_released, keycode)
+        gesture.connect("unpaired-release", self._on_long_press_button_unpaired_release)
+        btn.add_controller(gesture)
+        
+        self._grid.attach(btn, col, row, 1, 1)
+        
+        # Register button and shortcut label for updates
+        self._keycode_buttons[keycode] = btn
+        self._keycode_shortcut_labels[keycode] = shortcut_label
+
+    def _on_long_press_button_pressed(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float, keycode: str) -> None:
+        """Handle mouse press on a long-press-enabled button.
+        
+        Starts a timer for long-press detection (500ms).
+        """
+        # Stop any existing long-press timer
+        self._stop_long_press_timer()
+        
+        # Reset state
+        self._long_press_keycode = keycode
+        self._long_press_triggered = False
+        
+        # Start timer - if it fires, it's a long-press
+        self._long_press_timer_id = GLib.timeout_add(500, self._on_long_press_timer_fired)
+    
+    def _on_long_press_button_released(self, gesture: Gtk.GestureClick, n_press: int, x: float, y: float, keycode: str) -> None:
+        """Handle mouse release on a long-press-enabled button.
+        
+        If long-press was triggered, do nothing (long-press callback was already called).
+        If not triggered, it's a normal short press - send the keycode.
+        """
+        if not self._long_press_triggered:
+            # Normal short press - send keycode
+            if self._on_keyevent:
+                self._on_keyevent(keycode)
+        
+        # Clean up
+        self._stop_long_press_timer()
+    
+    def _on_long_press_button_unpaired_release(self, gesture: Gtk.GestureClick, x: float, y: float, button: int, sequence) -> None:
+        """Handle unpaired release (e.g., when pointer left button while pressed)."""
+        self._stop_long_press_timer()
+    
+    def _on_long_press_timer_fired(self) -> bool:
+        """Called when long-press timer fires (500ms held).
+        
+        This means the button was held long enough - trigger long-press action.
+        """
+        self._long_press_triggered = True
+        
+        if self._long_press_keycode and self._on_long_press:
+            self._on_long_press(self._long_press_keycode)
+        
+        self._long_press_timer_id = None
+        return False  # Don't repeat timer
+    
+    def _stop_long_press_timer(self) -> None:
+        """Stop the long-press timer and clear state."""
+        if self._long_press_timer_id is not None:
+            GLib.source_remove(self._long_press_timer_id)
+            self._long_press_timer_id = None
+        self._long_press_keycode = None
+        self._long_press_triggered = False
+
 
     def _add_search_button(self, col: int, row: int, icon_name: str | None = None) -> None:
         """Add Search button that sends text 's' for YouTube search."""
@@ -967,7 +1037,7 @@ class RemotePanel(Gtk.Box):
         self.append(section_box)
 
     def _create_media_button(self, label: str, keycode: str, icon_name: str) -> Gtk.Button:
-        """Create a media control button.
+        """Create a media control button with long-press support.
         
         Args:
             label: Button tooltip text.
@@ -979,10 +1049,17 @@ class RemotePanel(Gtk.Box):
         """
         btn = Gtk.Button()
         btn.set_tooltip_text(label)
-        btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
         
         image = create_icon(icon_name)
         btn.set_child(image)
+        
+        # Add GestureClick for long-press detection (same as other buttons)
+        gesture = Gtk.GestureClick()
+        gesture.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        gesture.connect("pressed", self._on_long_press_button_pressed, keycode)
+        gesture.connect("released", self._on_long_press_button_released, keycode)
+        gesture.connect("unpaired-release", self._on_long_press_button_unpaired_release)
+        btn.add_controller(gesture)
         
         # Register button for flash feedback
         self._keycode_buttons[keycode] = btn
