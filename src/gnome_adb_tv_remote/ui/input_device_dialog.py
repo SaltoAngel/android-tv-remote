@@ -20,6 +20,8 @@ from gi.repository import Adw, GLib, Gtk  # noqa: E402
 from typing import TYPE_CHECKING  # noqa: E402
 
 from ..core.adb_client import AdbTcpClient  # noqa: E402
+from ..core.network_info import get_ipv4_interface_networks  # noqa: E402
+from ..core.scanner import HostFound, ScanProgress, SubnetScanner  # noqa: E402
 
 if TYPE_CHECKING:
     from gi.repository import Gio
@@ -54,6 +56,11 @@ class InputDeviceDialog(Adw.Dialog):
         self._pairing_ip: str | None = None
         self._pairing_timer_id: int | None = None
         self._pairing_button: Gtk.Button | None = None
+        
+        # Scan state tracking
+        self._scan_in_progress = False
+        self._scan_cancel: threading.Event | None = None
+        self._found_ips: set[str] = set()
         
         self.set_content_width(400)
         self.set_content_height(300)
@@ -117,6 +124,14 @@ class InputDeviceDialog(Adw.Dialog):
         header = Adw.HeaderBar()
         header.set_show_end_title_buttons(False)
         header.set_show_start_title_buttons(False)
+        
+        # Add refresh button to header bar
+        refresh_btn = Gtk.Button()
+        refresh_btn.set_icon_name("view-refresh-symbolic")
+        refresh_btn.set_tooltip_text("Refresh device list")
+        refresh_btn.connect("clicked", self._on_refresh_clicked)
+        header.pack_end(refresh_btn)
+        
         toolbar_view.add_top_bar(header)
         toolbar_view.set_content(content)
         
@@ -141,7 +156,7 @@ class InputDeviceDialog(Adw.Dialog):
         other_devices = [d for d in devices if d.get("ip") != connected_ip]
         
         if not other_devices:
-            self._status_label.set_text("No other devices found.\nScan for devices in the main window.")
+            self._status_label.set_text("No other devices found.\nClick the refresh button to scan again.")
             self._status_label.set_visible(True)
             return
         
@@ -352,3 +367,128 @@ class InputDeviceDialog(Adw.Dialog):
             self._on_device_selected(ip)
         
         self.close()
+
+    def _on_refresh_clicked(self, _btn: Gtk.Button) -> None:
+        """Handle refresh button click - start network scan for devices."""
+        if self._scan_in_progress:
+            # Cancel current scan
+            if self._scan_cancel:
+                self._scan_cancel.set()
+            return
+        
+        # Clear existing device list
+        while child := self._device_list.get_first_child():
+            self._device_list.remove(child)
+        self._found_ips.clear()
+        
+        # Hide status label during scan
+        self._status_label.set_visible(False)
+        
+        # Get networks to scan
+        nets = [n.network for n in get_ipv4_interface_networks(limit_to_slash24_if_broader=True)]
+        if not nets:
+            self._status_label.set_text("No private IPv4 networks found to scan.")
+            self._status_label.set_visible(True)
+            return
+        
+        # Start scan
+        self._scan_in_progress = True
+        self._scan_cancel = threading.Event()
+        scanner = SubnetScanner(port=5555, timeout_s=0.35, concurrency=256)
+        
+        # Get currently connected IP to exclude
+        connected_ip = self._settings.get_string("last-connected-ip")
+        
+        def on_found(found: HostFound) -> None:
+            ip = str(found.ip)
+            # Skip the currently connected device
+            if ip == connected_ip:
+                return
+            GLib.idle_add(self._on_scan_found, ip, found.latency_ms)
+        
+        def run() -> None:
+            try:
+                scanner.scan(nets, cancel_event=self._scan_cancel, on_found=on_found)
+            finally:
+                GLib.idle_add(self._on_scan_finished)
+        
+        thread = threading.Thread(target=run, name="input-dialog-scan", daemon=True)
+        thread.start()
+        
+        # Show scanning status
+        self._status_label.set_text("Scanning for devices...")
+        self._status_label.set_visible(True)
+
+    def _on_scan_found(self, ip: str, latency_ms: float) -> None:
+        """Handle a device found during scan."""
+        if ip in self._found_ips:
+            return
+        self._found_ips.add(ip)
+        
+        # Hide "scanning" message once we find something
+        self._status_label.set_visible(False)
+        
+        # Add to UI
+        self._add_device_row(ip)
+        
+        # Check pairing and fetch device info in background
+        self._check_and_fetch_device_info(ip)
+
+    def _on_scan_finished(self) -> None:
+        """Handle scan completion."""
+        self._scan_in_progress = False
+        self._scan_cancel = None
+        
+        if len(self._found_ips) == 0:
+            self._status_label.set_text("No other devices found.\nClick the refresh button to scan again.")
+            self._status_label.set_visible(True)
+
+    def _check_and_fetch_device_info(self, ip: str) -> None:
+        """Check if device is paired and fetch device info in background thread."""
+        def check_and_fetch() -> None:
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=2.0)
+                is_paired = client.is_paired_silent()
+                
+                if is_paired:
+                    # Device is paired, try to connect and get device info
+                    try:
+                        client.connect()
+                        info = client.get_device_info()
+                        client.disconnect()
+                        
+                        device_name = f"{info.manufacturer} {info.model}"
+                        
+                        # Update UI with device info
+                        GLib.idle_add(self._update_device_row_info, ip, device_name, info.version)
+                        
+                        # Update discovered-devices in settings
+                        GLib.idle_add(
+                            self._update_discovered_device,
+                            ip,
+                            info.model,
+                            info.version,
+                            device_name
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        thread = threading.Thread(target=check_and_fetch, daemon=True)
+        thread.start()
+
+    def _update_device_row_info(self, ip: str, device_name: str, version: str | None) -> None:
+        """Update a device row with fetched device information."""
+        # Find the row by iterating through the list
+        child = self._device_list.get_first_child()
+        while child:
+            if isinstance(child, Adw.ActionRow) and child.get_title() == ip:
+                # Update title to device name
+                child.set_title(device_name)
+                if version:
+                    child.set_subtitle(f"{ip} • Android {version}")
+                else:
+                    child.set_subtitle(ip)
+                break
+            child = child.get_next_sibling()
