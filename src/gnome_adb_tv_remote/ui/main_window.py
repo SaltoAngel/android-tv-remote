@@ -882,8 +882,10 @@ class MainWindow(Adw.ApplicationWindow):
         try:
             scrcpy.send_keycode(keycode)
             
-            # Update volume slider when volume keys are pressed via keyboard shortcuts
-            if keycode == "KEYCODE_VOLUME_UP":
+            # Update volume state in UI when volume keys are pressed
+            if keycode == "KEYCODE_VOLUME_MUTE":
+                self._remote_panel.toggle_mute()
+            elif keycode == "KEYCODE_VOLUME_UP":
                 self._last_volume_change_time = time.time()
                 self._current_volume = min(self._current_volume + 1, self._remote_panel._volume_max)
                 self._remote_panel.update_volume(self._current_volume, self._remote_panel._volume_max, False)

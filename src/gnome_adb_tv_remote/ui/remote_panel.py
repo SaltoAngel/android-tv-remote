@@ -923,13 +923,13 @@ class RemotePanel(Gtk.Box):
                     child.set_from_icon_name("audio-volume-high-symbolic")
                     self._mute_button.remove_css_class("destructive-action")
 
-    def _on_mute_clicked(self, *_args) -> None:
-        """Handle mute button click - toggle mute state and send keyevent."""
-        # Toggle mute state in UI
+    def toggle_mute(self) -> None:
+        """Toggle the mute state and update UI."""
         self._is_muted = not self._is_muted
         self._update_mute_button_icon()
-        
-        # Send the keyevent to device
+
+    def _on_mute_clicked(self, *_args) -> None:
+        """Handle mute button click - delegate to keyevent handler."""
         if self._on_keyevent:
             self._on_keyevent("KEYCODE_VOLUME_MUTE")
 
