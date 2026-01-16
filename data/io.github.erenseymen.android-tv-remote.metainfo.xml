@@ -83,6 +83,21 @@
   </recommends>
   
   <releases>
+    <release version="1.1.0" date="2026-01-16">
+      <description>
+        <p>Major feature update including UI overhaul and new remote capabilities:</p>
+        <ul>
+          <li>Added start/end buttons for media playback</li>
+          <li>Implemented long-press support for buttons and keyboard shortcuts</li>
+          <li>Added hold-to-repeat for D-pad navigation with mouse</li>
+          <li>Added refresh button and network scanning to device selection dialog</li>
+          <li>Improved connection management with device name and model display</li>
+          <li>Refresh volume state correctly on connection</li>
+          <li>Modernized "Now Playing" interface and overall UI improvements</li>
+          <li>Various bug fixes including mute button state and volume slider initialization</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.0" date="2025-12-21">
       <description>
         <p>Stable release with improved features and UI enhancements:</p>
