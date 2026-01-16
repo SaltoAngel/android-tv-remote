@@ -19,10 +19,13 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 ## Features
 
 - **Auto-Connect**: Scans network for Android TVs (port 5555) and connects automatically.
-- **Full Control**: D-pad, Home/Back/Menu, volume, power, and media controls.
-- **App Management**: Launch installed apps and switch between recent ones (Ctrl+Tab).
-- **Performance**: Low-latency input (~35-70ms) via scrcpy-server.
-- **Integration**: MPRIS media controls and local keyboard input support.
+- **Full Control**: D-pad navigation, Home/Back/Menu, volume control with mute, and power functions.
+- **Media Controls**: Play/Pause, Previous/Next track, with real-time "Now Playing" display showing current media info.
+- **TV Input Switching**: Switch HDMI sources via dedicated TV Remote dialog (supports multi-device setups).
+- **Performance**: Low-latency input (~35-70ms) via scrcpy-server technology.
+- **Desktop Integration**: MPRIS support for controlling playback from desktop media widgets and notifications.
+- **Text Input**: Type directly on your TV using your computer's keyboard.
+- **Customizable Shortcuts**: All keyboard shortcuts are fully configurable in Preferences.
 
 ## Keyboard Shortcuts
 
@@ -48,6 +51,7 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 | T | TV Input (switch source) |
 | F | Search (YouTube) |
 | K | Focus Keyboard |
+| N | Notifications |
 | Ctrl+Tab | App Switcher (switch between recent apps) |
 | Ctrl+A | App Launcher (view all installed apps) |
 
@@ -60,7 +64,7 @@ flatpak run io.github.erenseymen.android-tv-remote
 
 ## Setup
 
-1. Enable **Developer options** and **USB/Wireless debugging** onto your TV.
+1. Enable **Developer options** and **USB/Wireless debugging** on your TV.
 2. Ensure ADB over network is enabled on **port 5555**.
 3. Accept the authorization prompt on your TV during first connection.
 
@@ -81,31 +85,28 @@ flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erens
 ```
 android-tv-remote/
 ├── src/gnome_adb_tv_remote/
-│   ├── core/               # Core functionality
-│   │   ├── adb_client.py      # ADB TCP client
-│   │   ├── keystore.py        # RSA key generation
-│   │   ├── network_info.py    # Network interface discovery
-│   │   ├── scanner.py         # Subnet scanning
+│   ├── core/                  # Core functionality
+│   │   ├── adb_client.py         # ADB TCP client & media session parsing
+│   │   ├── keystore.py           # RSA key generation for ADB auth
+│   │   ├── network_info.py       # Network interface discovery
+│   │   ├── scanner.py            # Subnet scanning for devices
 │   │   ├── scrcpy_controller.py  # Low-latency input via scrcpy-server
-│   │   ├── mpris_service.py   # MPRIS D-Bus integration for desktop media controls
-│   │   └── icon_cache.py      # Caching mechanism for retrieved app icons
-│   ├── ui/                 # User interface
-│   │   ├── main_window.py     # Main application window
-│   │   ├── device_dialog.py   # Device discovery dialog
-│   │   ├── remote_panel.py    # Remote control widget
-│   │   ├── preferences_dialog.py  # Keyboard shortcuts configuration
-│   │   ├── app_launcher_dialog.py # Installed apps browser
-│   │   ├── app_switcher_dialog.py # Recent apps switcher
-│   │   ├── info_dialog.py     # About/Information dialog
-│   │   ├── icon_loader.py     # Asynchronous icon loading helper
-│   │   └── ui_utils.py        # Shared UI utility functions
-│   ├── app.py              # Application entry point
-│   └── __main__.py         # Module entry point
-├── data/                   # Desktop and schema files
-├── flatpak/                # Flatpak build manifest
-└── pyproject.toml          # Python package configuration
+│   │   └── mpris_service.py      # MPRIS D-Bus integration for desktop media controls
+│   ├── ui/                    # User interface
+│   │   ├── main_window.py        # Main application window
+│   │   ├── device_dialog.py      # Device discovery & management dialog
+│   │   ├── remote_panel.py       # Remote control widget with Now Playing display
+│   │   ├── preferences_dialog.py # Keyboard shortcuts configuration
+│   │   ├── tv_remote_dialog.py   # TV Input source switching dialog
+│   │   ├── input_device_dialog.py # Alternative device selection for TV Input
+│   │   ├── info_dialog.py        # About/Information dialog
+│   │   └── ui_utils.py           # Shared UI utility functions
+│   ├── app.py                 # Application entry point
+│   └── __main__.py            # Module entry point
+├── data/                      # Desktop entry, icons, and GSettings schema
+├── flatpak/                   # Flatpak build manifest
+└── pyproject.toml             # Python package configuration
 ```
-
 
 ## Technical Overview
 
