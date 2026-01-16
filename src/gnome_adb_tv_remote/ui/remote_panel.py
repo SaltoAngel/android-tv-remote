@@ -212,6 +212,14 @@ class RemotePanel(Gtk.Box):
         
         # Cache for shortcuts to persist them when tooltips are updated dynamically
         self._cached_shortcuts: dict[str, str] = {}
+        
+        # Notifications button (special handler)
+        self._notifications_button: Gtk.Button | None = None
+        self._notifications_shortcut_label: Gtk.Label | None = None
+        
+        # Play/Pause button and icon for dynamic updates
+        self._play_pause_button: Gtk.Button | None = None
+        self._play_pause_icon: Gtk.Image | None = None
 
         # D-pad (rows 0-2)
         self._add_key_button("Up", "KEYCODE_DPAD_UP", 1, 0, icon_name="keyboard_arrow_up-symbolic.svg")
@@ -776,7 +784,11 @@ class RemotePanel(Gtk.Box):
         prev_btn = self._create_media_button("Prev", "KEYCODE_MEDIA_PREVIOUS", "media-skip-backward-symbolic")
         controls_row.append(prev_btn)
         
-        play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", ["media-playback-start-symbolic", "media-playback-pause-symbolic"])
+        # Play/Pause button - starts with play icon, will be updated based on playback status
+        play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", "media-playback-start-symbolic")
+        self._play_pause_button = play_btn
+        # Store reference to the icon for dynamic updates
+        self._play_pause_icon = play_btn.get_child()
         controls_row.append(play_btn)
         
         next_btn = self._create_media_button("Next", "KEYCODE_MEDIA_NEXT", "media-skip-forward-symbolic")
@@ -816,22 +828,23 @@ class RemotePanel(Gtk.Box):
         # Add section to main panel (at bottom)
         self.append(section_box)
 
-    def _create_media_button(self, label: str, keycode: str, icon_name: str | list[str]) -> Gtk.Button:
-        """Create a media control button."""
+    def _create_media_button(self, label: str, keycode: str, icon_name: str) -> Gtk.Button:
+        """Create a media control button.
+        
+        Args:
+            label: Button tooltip text.
+            keycode: Android keycode to send when clicked.
+            icon_name: Icon name to display (single icon, not a list).
+        
+        Returns:
+            The created button.
+        """
         btn = Gtk.Button()
         btn.set_tooltip_text(label)
         btn.connect("clicked", lambda *_: self._on_keyevent and self._on_keyevent(keycode))
         
-        if isinstance(icon_name, list):
-            icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-            icon_box.set_halign(Gtk.Align.CENTER)
-            for name in icon_name:
-                image = create_icon(name)
-                icon_box.append(image)
-            btn.set_child(icon_box)
-        else:
-            image = create_icon(icon_name)
-            btn.set_child(image)
+        image = create_icon(icon_name)
+        btn.set_child(image)
         
         # Register button for flash feedback
         self._keycode_buttons[keycode] = btn
@@ -1010,10 +1023,19 @@ class RemotePanel(Gtk.Box):
         # Update icon based on playback status
         if playback_status == "Playing":
             self._now_playing_icon.set_from_icon_name("media-playback-start-symbolic")
+            # Update Play/Pause button to show Pause icon when playing
+            if self._play_pause_icon and isinstance(self._play_pause_icon, Gtk.Image):
+                self._play_pause_icon.set_from_icon_name("media-playback-pause-symbolic")
         elif playback_status == "Paused":
             self._now_playing_icon.set_from_icon_name("media-playback-pause-symbolic")
+            # Update Play/Pause button to show Play icon when paused
+            if self._play_pause_icon and isinstance(self._play_pause_icon, Gtk.Image):
+                self._play_pause_icon.set_from_icon_name("media-playback-start-symbolic")
         else:
             self._now_playing_icon.set_from_icon_name("media-playback-stop-symbolic")
+            # When stopped, show Play icon
+            if self._play_pause_icon and isinstance(self._play_pause_icon, Gtk.Image):
+                self._play_pause_icon.set_from_icon_name("media-playback-start-symbolic")
         
         # Set tooltip with full info (shown on hover)
         tooltip = title
