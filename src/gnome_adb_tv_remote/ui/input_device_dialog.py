@@ -252,10 +252,74 @@ class InputDeviceDialog(Adw.Dialog):
         self._pairing_button.remove_css_class("accent")
         self._pairing_button.add_css_class("success")
 
-        # Select this device
+        # Fetch device info and update discovered-devices
         ip = self._pairing_ip
+        self._fetch_device_info_after_pairing(ip)
+
+        # Select this device
         self._reset_pairing_state()
         self._on_device_select(ip)
+
+    def _fetch_device_info_after_pairing(self, ip: str) -> None:
+        """Fetch device info after successful pairing and update discovered-devices."""
+        def fetch_info() -> None:
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
+                client.connect()
+                info = client.get_device_info()
+                client.disconnect()
+                
+                device_name = f"{info.manufacturer} {info.model}"
+                
+                # Update discovered-devices in settings
+                GLib.idle_add(
+                    self._update_discovered_device,
+                    ip,
+                    info.model,
+                    info.version,
+                    device_name
+                )
+            except Exception:
+                pass
+
+        thread = threading.Thread(target=fetch_info, daemon=True)
+        thread.start()
+
+    def _update_discovered_device(self, ip: str, model: str, version: str, device_name: str) -> None:
+        """Update a device in discovered-devices settings."""
+        import json
+        
+        devices_json = self._settings.get_string("discovered-devices")
+        devices: list[dict] = []
+        
+        try:
+            if devices_json:
+                devices = json.loads(devices_json)
+        except Exception:
+            pass
+        
+        # Find and update the device
+        found = False
+        for device in devices:
+            if device.get("ip") == ip:
+                device["model"] = model
+                device["version"] = version
+                device["device_name"] = device_name
+                found = True
+                break
+        
+        # If device not found, add it
+        if not found:
+            devices.append({
+                "ip": ip,
+                "latency_ms": 0.0,
+                "model": model,
+                "version": version,
+                "device_name": device_name
+            })
+        
+        # Save back to settings
+        self._settings.set_string("discovered-devices", json.dumps(devices))
 
     def _reset_pairing_state(self) -> None:
         """Reset the pairing state to allow new pairing attempts."""

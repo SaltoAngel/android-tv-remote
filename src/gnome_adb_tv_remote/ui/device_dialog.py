@@ -105,8 +105,9 @@ class DeviceDialog(Adw.Window):
                 latency = device.get("latency_ms", 0.0)
                 model = device.get("model")
                 version = device.get("version")
+                device_name = device.get("device_name")
                 if ip:
-                    self._on_scan_found_ui(ip, latency, save=False, model=model, version=version)
+                    self._on_scan_found_ui(ip, latency, save=False, model=model, version=version, device_name=device_name)
         except Exception:
             pass
 
@@ -218,7 +219,10 @@ class DeviceDialog(Adw.Window):
             GLib.idle_add(self._on_scan_progress_ui, p.scanned, p.total)
 
         def on_found(found: HostFound) -> None:
+            # First add the device to UI with basic info
             GLib.idle_add(self._on_scan_found_ui, str(found.ip), found.latency_ms)
+            # Then check pairing status and fetch device info in background
+            self._check_and_fetch_device_info(str(found.ip), found.latency_ms)
 
         def run() -> None:
             try:
@@ -248,7 +252,7 @@ class DeviceDialog(Adw.Window):
         self._scan_progress.set_fraction(frac)
         self._scan_progress.set_text(f"Scanning {scanned}/{total}")
 
-    def _on_scan_found_ui(self, ip: str, latency_ms: float, save: bool = True, model: str | None = None, version: str | None = None) -> None:
+    def _on_scan_found_ui(self, ip: str, latency_ms: float, save: bool = True, model: str | None = None, version: str | None = None, device_name: str | None = None) -> None:
         if ip in self._found_ips:
             return
         self._found_ips.add(ip)
@@ -259,12 +263,22 @@ class DeviceDialog(Adw.Window):
                 device_data["model"] = model
             if version:
                 device_data["version"] = version
+            if device_name:
+                device_data["device_name"] = device_name
             self._discovered_devices.append(device_data)
             self._save_discovered_devices()
 
-        # Create row with initial info
+        # Create row with device info
+        # Title: device_name if available, otherwise IP
+        title = device_name if device_name else ip
+        
+        # Build subtitle based on available info
         subtitle = f"Port 5555 open ({latency_ms:.0f} ms)"
-        if model and version:
+        if device_name and version:
+            subtitle = f"{ip} • Android {version} • {latency_ms:.0f} ms"
+        elif device_name:
+            subtitle = f"{ip} • {latency_ms:.0f} ms"
+        elif model and version:
             subtitle = f"{model} • Android {version} • {latency_ms:.0f} ms"
         elif model:
             subtitle = f"{model} • {latency_ms:.0f} ms"
@@ -272,7 +286,7 @@ class DeviceDialog(Adw.Window):
             subtitle = f"Android {version} • {latency_ms:.0f} ms"
 
         row = Adw.ActionRow(
-            title=GLib.markup_escape_text(ip),
+            title=GLib.markup_escape_text(title),
             subtitle=GLib.markup_escape_text(subtitle)
         )
 
@@ -286,8 +300,100 @@ class DeviceDialog(Adw.Window):
         self._device_list.append(row)
         self._device_rows[ip] = row
 
+    def _check_and_fetch_device_info(self, ip: str, latency_ms: float) -> None:
+        """Check if device is paired and fetch device info in background thread."""
+        def check_and_fetch() -> None:
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=2.0)
+                is_paired = client.is_paired_silent()
+                
+                if is_paired:
+                    # Device is paired, try to connect and get device info
+                    try:
+                        client.connect()
+                        info = client.get_device_info()
+                        client.disconnect()
+                        # Update UI with device info
+                        GLib.idle_add(
+                            self._update_device_row, 
+                            ip, 
+                            latency_ms, 
+                            info.model,
+                            info.version,
+                            f"{info.manufacturer} {info.model}"  # Device name
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
+        thread = threading.Thread(target=check_and_fetch, daemon=True)
+        thread.start()
 
+    def _update_device_row(self, ip: str, latency_ms: float, model: str | None, version: str | None, device_name: str | None) -> None:
+        """Update a device row with fetched device information."""
+        if ip not in self._device_rows:
+            return
+        
+        row = self._device_rows[ip]
+        
+        # Build new subtitle with device info (IP in subtitle since device_name is in title)
+        if device_name and version:
+            subtitle = f"{ip} • Android {version} • {latency_ms:.0f} ms"
+        elif device_name:
+            subtitle = f"{ip} • {latency_ms:.0f} ms"
+        elif model and version:
+            subtitle = f"{model} • Android {version} • {latency_ms:.0f} ms"
+        elif model:
+            subtitle = f"{model} • {latency_ms:.0f} ms"
+        else:
+            return  # No new info to display
+        
+        # Update the row
+        row.set_title(GLib.markup_escape_text(device_name or ip))
+        row.set_subtitle(GLib.markup_escape_text(subtitle))
+        
+        # Update saved data
+        for device in self._discovered_devices:
+            if device.get("ip") == ip:
+                device["model"] = model
+                device["version"] = version
+                device["device_name"] = device_name
+                break
+        self._save_discovered_devices()
+
+    def _fetch_device_info_after_pairing(self, ip: str) -> None:
+        """Fetch device info after successful pairing and update the row."""
+        def fetch_info() -> None:
+            try:
+                client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
+                client.connect()
+                info = client.get_device_info()
+                client.disconnect()
+                
+                device_name = f"{info.manufacturer} {info.model}"
+                
+                # Find latency from discovered devices
+                latency_ms = 0.0
+                for device in self._discovered_devices:
+                    if device.get("ip") == ip:
+                        latency_ms = device.get("latency_ms", 0.0)
+                        break
+                
+                # Update UI
+                GLib.idle_add(
+                    self._update_device_row,
+                    ip,
+                    latency_ms,
+                    info.model,
+                    info.version,
+                    device_name
+                )
+            except Exception:
+                pass
+
+        thread = threading.Thread(target=fetch_info, daemon=True)
+        thread.start()
 
 
     def _connect_from_row(self, ip: str, btn: Gtk.Button) -> None:
@@ -376,8 +482,11 @@ class DeviceDialog(Adw.Window):
         self._pairing_button.remove_css_class("accent")
         self._pairing_button.add_css_class("success")
 
-        # Connect silently in the background
+        # Fetch device info now that we're paired
         ip = self._pairing_ip
+        self._fetch_device_info_after_pairing(ip)
+
+        # Connect silently in the background
         
         def on_connect_done() -> None:
             # Close the dialog when connection is established
