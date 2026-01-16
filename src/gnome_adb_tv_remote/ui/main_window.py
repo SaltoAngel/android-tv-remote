@@ -869,7 +869,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         if keycode:
             # D-pad directions: send immediately (they have their own repeat behavior)
-            if keycode in ("KEYCODE_DPAD_UP", "KEYCODE_DPAD_DOWN", "KEYCODE_DPAD_LEFT", "KEYCODE_DPAD_RIGHT"):
+            if keycode in ("KEYCODE_DPAD_UP", "KEYCODE_DPAD_DOWN", "KEYCODE_DPAD_LEFT", "KEYCODE_DPAD_RIGHT",
+                           "KEYCODE_VOLUME_UP", "KEYCODE_VOLUME_DOWN"):
                 self._remote_panel.flash_button(keycode)
                 self._on_remote_keyevent(keycode)
                 return True
