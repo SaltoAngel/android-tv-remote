@@ -65,7 +65,8 @@ class TvRemoteDialog(Adw.Window):
         self._tv_device_info = tv_device_info  # Device info for display
         self._key_map: dict[int, str] = {}
         self._title_widget: Adw.WindowTitle | None = None
-        self._selection_made = False  # Track if OK/Select was pressed (to avoid re-sending TV_INPUT on close)
+        self._selection_made = False  # Track if OK/Select was pressed
+        self._send_back_on_close = False  # Track if Back signal should be sent on close (keyboard shortcut)
         
         self._build_ui()
         self._load_dpad_shortcuts()
@@ -83,28 +84,30 @@ class TvRemoteDialog(Adw.Window):
         self.connect("close-request", self._on_close_request)
 
     def _on_close_request(self, *_args) -> bool:
-        """Send Input command and close the dialog."""
-        # Only send Input command to TV if no selection was made
-        # (If user selected an input, the menu is already closed - don't reopen it!)
-        if not self._selection_made:
-            self._send_input_command_to_tv()
+        """Close the dialog, sending Back signal only if closed via keyboard shortcut."""
+        # Send Back signal if closed via keyboard shortcut (Escape or Back key)
+        # but NOT if a selection was made (user selected an input)
+        if self._send_back_on_close and not self._selection_made:
+            self._send_keycode_to_tv("KEYCODE_BACK")
         self.hide()
         return True
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle keyboard shortcuts for d-pad, Escape, and Back keys."""
-        # Escape closes the dialog (Input signal will be sent in _on_close_request)
+        # Escape closes the dialog and sends Back signal
         if keyval == Gdk.KEY_Escape:
+            self._send_back_on_close = True
             self.close()
             return True
         
-        # Check for Back key (Q) - closes the dialog (Input signal will be sent in _on_close_request)
+        # Check for Back key (Q) - closes the dialog and sends Back signal
         from .preferences_dialog import ACTION_TO_KEYCODE, gdk_name_to_keyval, _load_shortcuts_dict
         shortcuts = _load_shortcuts_dict(self._settings)
         back_keys = shortcuts.get("back", [])
         for key_name in back_keys:
             keyval_back = gdk_name_to_keyval(key_name)
             if keyval_back and (keyval == keyval_back or Gdk.keyval_to_lower(keyval) == keyval_back):
+                self._send_back_on_close = True
                 self.close()
                 return True
         
