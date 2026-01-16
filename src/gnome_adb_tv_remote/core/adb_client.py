@@ -618,15 +618,15 @@ df -h /data | tail -1
                 banner = socket.gethostname().encode()
 
             # Create transaction info
+            adb_info = None
             try:
-                 adb_info = _AdbTransactionInfo(None, None, timeout, timeout, None)
+                adb_info = _AdbTransactionInfo(None, None, timeout, timeout, None)
             except TypeError:
                 # Some versions might have different signature for _AdbTransactionInfo
-                # But creating a dummy object with required attributes is safer if constructor varies
                 pass
             
-            # If constructor failed or we want to be safe with duck typing:
-            if 'adb_info' not in locals():
+            # If constructor failed, use a mock object with required attributes
+            if adb_info is None:
                 class MockInfo:
                     def __init__(self, t):
                         self.transport_timeout_s = t
