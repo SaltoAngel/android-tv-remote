@@ -744,12 +744,7 @@ class RemotePanel(Gtk.Box):
         self._now_playing_box.add_css_class("now-playing-box")
         self._now_playing_box.set_hexpand(True)
         
-        # Playing icon
-        self._now_playing_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-        self._now_playing_icon.set_pixel_size(24)
-        self._now_playing_box.append(self._now_playing_icon)
-        
-        # Text container
+        # Text container (icon removed - Play/Pause button shows state)
         text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         text_box.set_valign(Gtk.Align.CENTER)
         text_box.set_hexpand(True)
@@ -1020,19 +1015,16 @@ class RemotePanel(Gtk.Box):
         else:
             self._now_playing_artist.set_visible(False)
         
-        # Update icon based on playback status
+        # Update Play/Pause button icon based on playback status
         if playback_status == "Playing":
-            self._now_playing_icon.set_from_icon_name("media-playback-start-symbolic")
             # Update Play/Pause button to show Pause icon when playing
             if self._play_pause_icon and isinstance(self._play_pause_icon, Gtk.Image):
                 self._play_pause_icon.set_from_icon_name("media-playback-pause-symbolic")
         elif playback_status == "Paused":
-            self._now_playing_icon.set_from_icon_name("media-playback-pause-symbolic")
             # Update Play/Pause button to show Play icon when paused
             if self._play_pause_icon and isinstance(self._play_pause_icon, Gtk.Image):
                 self._play_pause_icon.set_from_icon_name("media-playback-start-symbolic")
         else:
-            self._now_playing_icon.set_from_icon_name("media-playback-stop-symbolic")
             # When stopped, show Play icon
             if self._play_pause_icon and isinstance(self._play_pause_icon, Gtk.Image):
                 self._play_pause_icon.set_from_icon_name("media-playback-start-symbolic")
