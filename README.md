@@ -16,20 +16,18 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 | :---: | :---: |
 | ![Light Mode](screenshots/light.png) | ![Dark Mode](screenshots/dark.png) |
 
-## Features
-
-- **Auto-Connect**: Scans network for Android TVs (port 5555) and connects automatically.
+- **Smart Connectivity**: Automatically discovers and reconnects to devices even if their IP addresses change, using background network scanning and model verification.
 - **Full Control**: D-pad navigation, Home/Back/Menu, volume control with mute, and power functions.
-- **Media Controls**: Play/Pause, Previous/Next track, with real-time "Now Playing" display showing current media info.
-- **TV Input Switching**: Switch HDMI sources via dedicated TV Remote dialog (supports multi-device setups).
-- **Performance**: Low-latency input (~35-70ms) via scrcpy-server technology.
-- **Desktop Integration**: MPRIS support for controlling playback from desktop media widgets and notifications.
-- **Text Input**: Type directly on your TV using your computer's keyboard.
+- **Long Press Support**: Hold buttons (both in UI and keyboard) for secondary actions like context menus or power options.
+- **Media Controls**: Play/Pause, Previous/Next track, with a premium, real-time "Now Playing" dashboard.
+- **TV Input Routing**: Dedicated TV Remote dialog for switching HDMI sources, with smart support for multi-device setups (e.g., controlling TV inputs while connected to a streaming box).
+- **Desktop integration**: MPRIS support for controlling playback from GNOME media widgets and notifications.
+- **Premium Interface**: Modern GTK4/Libadwaita design featuring dynamic gradients, micro-animations, and a sleek dark mode.
 - **Customizable Shortcuts**: All keyboard shortcuts are fully configurable in Preferences.
 
 ## Keyboard Shortcuts
 
-*Essential shortcuts listed below. All are configurable in Preferences.*
+*Essential shortcuts listed below. All are configurable in Preferences. Most shortcuts support **Long Press** for secondary actions.*
 
 | Key | Action |
 | --- | --- |
@@ -76,6 +74,9 @@ flatpak run io.github.erenseymen.android-tv-remote
 ```bash
 # Build and install locally
 flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erenseymen.android-tv-remote.yml
+
+# Run locally
+flatpak run io.github.erenseymen.android-tv-remote
 ```
 
 ## Project Structure
@@ -83,27 +84,23 @@ flatpak-builder --user --install --force-clean build-dir flatpak/io.github.erens
 ```
 android-tv-remote/
 ├── src/gnome_adb_tv_remote/
-│   ├── core/                  # Core functionality
-│   │   ├── adb_client.py         # ADB TCP client & media session parsing
-│   │   ├── keystore.py           # RSA key generation for ADB auth
-│   │   ├── network_info.py       # Network interface discovery
-│   │   ├── scanner.py            # Subnet scanning for devices
-│   │   ├── scrcpy_controller.py  # Low-latency input via scrcpy-server
-│   │   └── mpris_service.py      # MPRIS D-Bus integration for desktop media controls
-│   ├── ui/                    # User interface
-│   │   ├── main_window.py        # Main application window
-│   │   ├── device_dialog.py      # Device discovery & management dialog
-│   │   ├── remote_panel.py       # Remote control widget with Now Playing display
-│   │   ├── preferences_dialog.py # Keyboard shortcuts configuration
-│   │   ├── tv_remote_dialog.py   # TV Input source switching dialog
-│   │   ├── input_device_dialog.py # Alternative device selection for TV Input
-│   │   ├── info_dialog.py        # About/Information dialog
-│   │   └── ui_utils.py           # Shared UI utility functions
-│   ├── app.py                 # Application entry point
-│   └── __main__.py            # Module entry point
-├── data/                      # Desktop entry, icons, and GSettings schema
-├── flatpak/                   # Flatpak build manifest
-└── pyproject.toml             # Python package configuration
+│   ├── core/                  # Core Logic
+│   │   ├── adb_client.py         # Pure-Python ADB client & media parsing
+│   │   ├── scanner.py            # High-concurrency network discovery
+│   │   ├── scrcpy_controller.py  # Low-latency input injection (~35-70ms)
+│   │   ├── mpris_service.py      # D-Bus integration for desktop controls
+│   │   └── keystore.py           # Secure RSA key management for ADB
+│   ├── ui/                    # GTK4 User Interface
+│   │   ├── main_window.py        # Main app logic & shortcut handling
+│   │   ├── remote_panel.py       # Remote interface & Now Playing dashboard
+│   │   ├── device_dialog.py      # Device discovery & pairing manager
+│   │   ├── tv_remote_dialog.py   # HDMI/Input switching interface
+│   │   └── preferences_dialog.py # Keyboard shortcut configuration
+│   ├── app.py                 # Adw.Application entry point
+│   └── __main__.py            # Module runner
+├── data/                      # Desktop files, Icons, and GSettings
+├── flatpak/                   # Flatpak build manifests
+└── pyproject.toml             # Project metadata and dependencies
 ```
 
 ## Technical Overview
