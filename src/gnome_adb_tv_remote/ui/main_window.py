@@ -1520,6 +1520,8 @@ class MainWindow(Adw.ApplicationWindow):
                 GLib.idle_add(self._on_media_info_fetched, media_info)
             except Exception as e:
                 logger.debug(f"Failed to fetch media info: {e}")
+                # Connection likely lost - trigger reconnection on main thread
+                GLib.idle_add(self._handle_connection_drop)
         
         threading.Thread(target=worker, daemon=True).start()
         return True  # Continue polling
@@ -1555,3 +1557,23 @@ class MainWindow(Adw.ApplicationWindow):
                 artist=None,
                 playback_status="Stopped",
             )
+
+    def _handle_connection_drop(self) -> None:
+        """Called when a background check (like media polling) detects connection loss.
+        
+        This handles cases where the network drops or PC wakes from sleep,
+        triggering an automatic reconnection attempt.
+        """
+        # Only act if we think we are still connected
+        if not self._connected_ip:
+            return
+
+        current_ip = self._connected_ip
+        logger.warning(f"Connection lost to {current_ip}. Attempting to reconnect...")
+        
+        # Disconnect cleanly to update UI and stop polling
+        self._set_connected(False)
+        
+        # Attempt reconnection with discovery fallback
+        # This will verify the connection and if failed, start discovery
+        self._connect_ip_with_discovery_fallback(current_ip)
