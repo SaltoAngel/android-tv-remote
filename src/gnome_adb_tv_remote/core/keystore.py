@@ -161,6 +161,12 @@ def _generate_adb_keypair(private_key_path: str) -> None:
     )
     with open(private_key_path, "wb") as f:
         f.write(pem_data)
+    
+    # Secure the private key file by restricting permissions to owner-only
+    try:
+        os.chmod(private_key_path, 0o600)
+    except OSError:
+        pass  # Best effort if filesystem doesn't support permissions
 
     # Write Android public key file
     android_pubkey = _encode_android_pubkey(pub_key.n, pub_key.e)
@@ -178,6 +184,13 @@ def ensure_adb_keys_exist(app_dir_name: str = "android-tv-remote") -> AdbKeyPath
     paths.private_key.parent.mkdir(parents=True, exist_ok=True)
 
     if paths.private_key.exists() and paths.public_key.exists():
+        # Ensure private key is secure (0o600)
+        try:
+            current_mode = paths.private_key.stat().st_mode
+            if (current_mode & 0o777) != 0o600:
+                paths.private_key.chmod(0o600)
+        except OSError:
+            pass  # Best effort
         return paths
 
     # Generate new keypair using our custom implementation (no cryptography dep)
