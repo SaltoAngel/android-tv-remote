@@ -17,12 +17,17 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 | ![Light Mode](screenshots/light.png) | ![Dark Mode](screenshots/dark.png) |
 
 - **Smart Connectivity**: Automatically discovers and reconnects to devices even if their IP addresses change, using background network scanning and model verification.
-- **Full Control**: D-pad navigation, Home/Back/Menu, volume control with mute, and power functions.
-- **Long Press Support**: Hold buttons (both in UI and keyboard) for secondary actions like context menus or power options.
-- **Media Controls**: Play/Pause, Previous/Next track, with a premium, real-time "Now Playing" dashboard.
-- **TV Input Routing**: Dedicated TV Remote dialog for switching HDMI sources, with smart support for multi-device setups (e.g., controlling TV inputs while connected to a streaming box).
-- **Desktop integration**: MPRIS support for controlling playback from GNOME media widgets and notifications.
-- **Premium Interface**: Modern GTK4/Libadwaita design featuring dynamic gradients, micro-animations, and a sleek dark mode.
+- **Precision Input**: Ultra-low latency input injection (~35-70ms) powered by scrcpy-server, providing smooth navigation and tactile responsiveness.
+- **Long Press Support**: Hold buttons (both in UI and keyboard) for secondary actions:
+    - **Power**: Long-press for Power Menu (Restart/Sleep/Shutdown).
+    - **OK/Select**: Long-press for Context Menus (options, add to favorites).
+    - **Home/Back/Menu/Apps**: Long-press for various app-specific shortcuts.
+- **Instant Seeking**: Hold any D-pad direction button (mouse or keyboard) for high-speed "Hold-to-Repeat" navigation.
+- **Premium Interface Dashboard**: Modern GTK4/Libadwaita design featuring:
+    - **Dynamic Dash**: A real-time "Now Playing" dashboard with glassmorphism effects and gradients.
+    - **Media Control**: Play/Pause, Previous/Next track with automatic status synchronization.
+- **TV Input Routing**: Dedicated dialog for switching HDMI sources, with smart support for multi-device setups (e.g., controlling TV inputs while connected to a streaming box).
+- **Desktop Integration**: Full MPRIS support for controlling playback from GNOME media widgets, lock screen, and notifications.
 - **Customizable Shortcuts**: All keyboard shortcuts are fully configurable in Preferences.
 
 ## Keyboard Shortcuts
@@ -31,25 +36,26 @@ A GTK-based remote control for Android TV devices, powered by [scrcpy](https://g
 
 | Key | Action |
 | --- | --- |
-| Arrow Keys / W A S D | Navigate (Up/Down/Left/Right) |
-| Enter / E | OK/Select |
-| Esc / Q | Back |
-| H | Home |
-| I | Menu |
-| R | Apps |
-| G | Google Assistant |
-| Space | Play/Pause |
-| Z | Previous |
-| X | Next |
-| M | Mute |
-| + or . | Volume Up |
-| - or , | Volume Down |
-| Delete | Power |
-| C | Captions/Subtitles |
-| T | TV Input (switch source) |
-| F | Search (YouTube) |
-| K | Focus Keyboard |
-| N | Notifications |
+| Arrow Keys / **W A S D** | Navigate (Up/Down/Left/Right) — *Supports Hold-to-Repeat* |
+| **Enter** / **E** | OK/Select — *Long Press for Context Menu* |
+| **Esc** / **Q** / **Backspace** | Back |
+| **H** | Home |
+| **I** | Menu |
+| **R** | Apps |
+| **G** | Google Assistant |
+| **Space** | Play/Pause |
+| **Z** | Previous |
+| **X** | Next |
+| **M** | Mute |
+| **+** or **.** | Volume Up |
+| **-** or **,** | Volume Down |
+| **Delete** | Power — *Long Press for Power Menu* |
+| **C** | Captions/Subtitles |
+| **T** | TV Input (Switch HDMI source) |
+| **F** | Search (YouTube) |
+| **Tab** | Focus Keyboard (Input text directly) |
+| **N** | Notifications |
+
 
 ## Installation
 
@@ -83,25 +89,31 @@ flatpak run io.github.erenseymen.android-tv-remote
 
 ```
 android-tv-remote/
-├── src/gnome_adb_tv_remote/
-│   ├── core/                  # Core Logic
-│   │   ├── adb_client.py         # Pure-Python ADB client & media parsing
-│   │   ├── scanner.py            # High-concurrency network discovery
-│   │   ├── scrcpy_controller.py  # Low-latency input injection (~35-70ms)
-│   │   ├── mpris_service.py      # D-Bus integration for desktop controls
-│   │   └── keystore.py           # Secure RSA key management for ADB
-│   ├── ui/                    # GTK4 User Interface
-│   │   ├── main_window.py        # Main app logic & shortcut handling
-│   │   ├── remote_panel.py       # Remote interface & Now Playing dashboard
+├── src/gnome_adb_tv_remote/     # Main Application Package
+│   ├── core/                  # Engine & Domain Logic
+│   │   ├── adb_client.py         # Pure-Python ADB client, media & status parsing
+│   │   ├── scanner.py            # High-concurrency network discovery engine
+│   │   ├── scrcpy_controller.py  # Low-latency scrcpy-server protocol handler
+│   │   ├── mpris_service.py      # Linux Media Player (MPRIS) D-Bus integration
+│   │   ├── keystore.py           # Secure RSA key management for ADB Auth
+│   │   └── network_info.py       # Local network interface & subnet detection
+│   ├── ui/                    # Gtk4/Libadwaita Interface
+│   │   ├── main_window.py        # Application coordinator & event handling
+│   │   ├── remote_panel.py       # Remote controls & Now Playing dashboard
 │   │   ├── device_dialog.py      # Device discovery & pairing manager
-│   │   ├── tv_remote_dialog.py   # HDMI/Input switching interface
-│   │   └── preferences_dialog.py # Keyboard shortcut configuration
-│   ├── app.py                 # Adw.Application entry point
-│   └── __main__.py            # Module runner
-├── data/                      # Desktop files, Icons, and GSettings
-├── flatpak/                   # Flatpak build manifests
-└── pyproject.toml             # Project metadata and dependencies
+│   │   ├── tv_remote_dialog.py   # HDMI/Input switching overlay
+│   │   ├── input_device_dialog.py # Multi-device routing selector
+│   │   ├── preferences_dialog.py # Keyboard shortcut & routing settings
+│   │   ├── info_dialog.py        # Help, about and instructions
+│   │   └── ui_utils.py           # Reusable UI components & animations
+│   ├── app.py                 # Adw.Application lifecycle management
+│   └── __main__.py            # CLI entry point
+├── data/                      # GSettings schemas, .desktop, Icons
+├── flatpak/                   # Flatpak manifests & build configuration
+├── pyproject.toml             # Dependency & build metadata
+└── screenshots/               # UI presentation assets
 ```
+
 
 ## Technical Overview
 
