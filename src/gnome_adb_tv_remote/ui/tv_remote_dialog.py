@@ -65,6 +65,7 @@ class TvRemoteDialog(Adw.Window):
         self._tv_device_info = tv_device_info  # Device info for display
         self._key_map: dict[int, str] = {}
         self._title_widget: Adw.WindowTitle | None = None
+        self._selection_made = False  # Track if OK/Select was pressed (to avoid re-sending TV_INPUT on close)
         
         self._build_ui()
         self._load_dpad_shortcuts()
@@ -83,8 +84,10 @@ class TvRemoteDialog(Adw.Window):
 
     def _on_close_request(self, *_args) -> bool:
         """Send Input command and close the dialog."""
-        # Send Input command to TV before closing (to toggle input menu)
-        self._send_input_command_to_tv()
+        # Only send Input command to TV if no selection was made
+        # (If user selected an input, the menu is already closed - don't reopen it!)
+        if not self._selection_made:
+            self._send_input_command_to_tv()
         self.hide()
         return True
 
@@ -112,6 +115,8 @@ class TvRemoteDialog(Adw.Window):
         if keycode and keycode in DPAD_KEYCODES:
             # If OK/Select (KEYCODE_DPAD_CENTER), close dialog after sending command
             if keycode == "KEYCODE_DPAD_CENTER":
+                # Mark that a selection was made (so we don't re-send TV_INPUT on close)
+                self._selection_made = True
                 # Flash the button
                 self._flash_button(keycode)
                 # Send command to TV
@@ -268,7 +273,7 @@ class TvRemoteDialog(Adw.Window):
         btn.set_hexpand(True)
         btn.set_vexpand(True)
         
-        btn.connect("clicked", lambda *_: self._send_keycode_to_tv(keycode))
+        btn.connect("clicked", lambda *_: self._on_button_clicked(keycode))
         
         # Create icon or label
         if icon_name:
@@ -279,3 +284,15 @@ class TvRemoteDialog(Adw.Window):
         
         grid.attach(btn, col, row, 1, 1)
         self._keycode_buttons[keycode] = btn
+
+    def _on_button_clicked(self, keycode: str) -> None:
+        """Handle button click - send keycode and close dialog if OK/Select was pressed."""
+        self._send_keycode_to_tv(keycode)
+        
+        # If OK/Select (KEYCODE_DPAD_CENTER), close dialog after sending command
+        if keycode == "KEYCODE_DPAD_CENTER":
+            # Mark that a selection was made (so we don't re-send TV_INPUT on close)
+            self._selection_made = True
+            # Close dialog after a short delay
+            GLib.timeout_add(100, lambda: self.close() or False)
+
