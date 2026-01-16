@@ -413,9 +413,9 @@ class AdbTcpClient:
                     # Found a hardware input service - this is a real TV
                     return True
             
+            
             # Check for HW device entries (pattern like /HW9, /HW10)
             # These indicate physical hardware inputs
-            import re
             if re.search(r'/HW\d+', output):
                 return True
             
