@@ -230,6 +230,7 @@ class RemotePanel(Gtk.Box):
         self._on_volume_change = None  # Callback for volume changes
         self._updating_slider = False  # Prevent feedback loops
         self._is_muted: bool = False  # Track mute state for UI toggle
+        self._volume_initialized: bool = False  # Track if volume has been fetched from device
         
         # Cache for shortcuts to persist them when tooltips are updated dynamically
         self._cached_shortcuts: dict[str, str] = {}
@@ -817,8 +818,10 @@ class RemotePanel(Gtk.Box):
         controls_row.append(next_btn)
         
         # Center: Volume slider
-        adjustment = Gtk.Adjustment(value=0, lower=0, upper=15, step_increment=1, page_increment=1)
+        # Start with middle value (7/15) to avoid showing 0 before real value is fetched
+        adjustment = Gtk.Adjustment(value=7, lower=0, upper=15, step_increment=1, page_increment=1)
         slider = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adjustment)
+        slider.set_sensitive(False)  # Disable until real volume is fetched
         slider.set_hexpand(True)
         slider.set_draw_value(False)
         slider.set_tooltip_text("Volume")
@@ -841,6 +844,7 @@ class RemotePanel(Gtk.Box):
         mute_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
         mute_icon.set_pixel_size(24)
         mute_btn.set_child(mute_icon)
+        mute_btn.set_sensitive(False)  # Disable until real volume is fetched
         controls_row.append(mute_btn)
         self._mute_button = mute_btn
         self._keycode_buttons["KEYCODE_VOLUME_MUTE"] = mute_btn
@@ -935,13 +939,19 @@ class RemotePanel(Gtk.Box):
         """
         self._volume_max = max_vol
         self._is_muted = is_muted
+        self._volume_initialized = True
         
         if self._volume_slider:
             self._updating_slider = True
             adjustment = self._volume_slider.get_adjustment()
             adjustment.set_upper(max_vol)
             adjustment.set_value(current)
+            self._volume_slider.set_sensitive(True)  # Enable slider after fetching real volume
             self._updating_slider = False
+        
+        # Enable mute button after volume is fetched
+        if self._mute_button:
+            self._mute_button.set_sensitive(True)
         
         # Update mute button icon based on muted state
         self._update_mute_button_icon()
