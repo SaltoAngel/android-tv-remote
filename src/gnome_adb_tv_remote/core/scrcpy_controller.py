@@ -16,7 +16,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +127,9 @@ class ScrcpyServerController:
 
     Architecture:
     1. Push scrcpy-server to device
-    2. Start server via app_process
-    3. Setup ADB port forwarding to server's control socket
-    4. Send control messages directly over the socket
+    2. Start server via app_process (nohup)
+    3. Setup dedicated native AdbDeviceTcp client
+    4. Send control messages directly over localabstract stream
     """
 
     # Server version we're compatible with
@@ -138,18 +138,24 @@ class ScrcpyServerController:
 
     def __init__(
         self,
-        adb_client: Any,
+        adb_client: 'Any',
     ) -> None:
         self._adb = adb_client
         self._host = adb_client.host
         self._port = 5555  # Default ADB port
-        self._control_socket: Optional[socket.socket] = None
+        
+        # ADB clients/devices for isolated streams
+        self._server_client: 'Optional[Any]' = None
+        self._server_thread: 'Optional[threading.Thread]' = None
+        
+        self._scrcpy_client: 'Optional[Any]' = None
+        self._scrcpy_device: 'Optional[Any]' = None
+        self._adb_info: 'Optional[Any]' = None
+        
         self._connected = False
         self._server_started = False
-        self._forward_port: Optional[int] = None
         self._lock = threading.Lock()
         self._on_disconnect: Optional[Callable[[], None]] = None
-        self._shell_process: Optional[subprocess.Popen] = None
 
     @property
     def connected(self) -> bool:
@@ -168,17 +174,17 @@ class ScrcpyServerController:
                 return
 
             try:
-                # 1. Ensure server is on device using adb_shell (authorized)
+                # 1. Ensure server is on device using main adb_shell connection
                 self._ensure_server_on_device()
 
-                # 2. Start server
+                # 2. Start server via async nohup shell command
                 self._start_server()
 
-                # 3. Setup forwarding and connect
+                # 3. Setup dedicated ADB client and localabstract connection
                 self._setup_connection()
 
                 self._connected = True
-                logger.info("Connected to scrcpy-server (low-latency input enabled)")
+                logger.info("Connected to scrcpy-server (low-latency adb_shell input enabled)")
 
             except Exception as e:
                 self._cleanup()
@@ -192,34 +198,39 @@ class ScrcpyServerController:
     def _cleanup(self) -> None:
         self._connected = False
 
-        # Close control socket
-        if self._control_socket:
+        if self._scrcpy_device and self._adb_info:
             try:
-                self._control_socket.close()
+                self._scrcpy_device._clse(self._adb_info)
             except Exception:
                 pass
-            self._control_socket = None
+            self._adb_info = None
 
-        # Terminate server process (if any)
-        if self._shell_process:
+        if self._scrcpy_client:
             try:
-                self._shell_process.terminate()
-                self._shell_process.wait(timeout=2.0)
-            except Exception:
-                try:
-                    self._shell_process.kill()
-                except Exception:
-                    pass
-            self._shell_process = None
-
-        # Remove port forwarding
-        if self._forward_port:
-            try:
-                adb = self._find_adb()
-                subprocess.run([adb, "forward", "--remove", f"tcp:{self._forward_port}"], capture_output=True)
+                self._scrcpy_client.disconnect()
             except Exception:
                 pass
-            self._forward_port = None
+            self._scrcpy_client = None
+            self._scrcpy_device = None
+
+        if self._server_client:
+            try:
+                self._server_client.disconnect()
+            except Exception:
+                pass
+            self._server_client = None
+
+        # Give thread a moment to finish cleanly
+        if self._server_thread and self._server_thread.is_alive():
+            self._server_thread.join(timeout=1.0)
+            self._server_thread = None
+
+        if self._server_started:
+            try:
+                self._adb.shell("pkill -f scrcpy-server")
+                self._adb.shell("pkill -f com.genymobile.scrcpy.Server")
+            except Exception:
+                pass
 
         self._server_started = False
 
@@ -237,17 +248,6 @@ class ScrcpyServerController:
 
         return None
 
-    def _find_adb(self) -> str:
-        """Find the adb executable."""
-        candidates = ["/app/bin/adb", "adb"]
-        for candidate in candidates:
-            path = shutil.which(candidate)
-            if path:
-                return path
-            if os.path.isabs(candidate) and os.path.isfile(candidate):
-                return candidate
-        raise ScrcpyError("adb not found")
-
     def _ensure_server_on_device(self) -> None:
         """Push scrcpy-server to device if needed."""
         local_server = self._find_local_server()
@@ -258,150 +258,133 @@ class ScrcpyServerController:
         # Use adb_shell for fast, authorized push
         self._adb.device.push(str(local_server), self.DEVICE_SERVER_PATH)
 
-    def _wait_for_device_cli(self, adb: str, env: dict) -> None:
-        """Wait for the device to be recognized by adb CLI as 'device'."""
-        target = f"{self._host}:{self._port}"
-        
-        # Try connecting
-        subprocess.run([adb, "connect", target], capture_output=True, env=env, timeout=5)
-        
-        # Wait up to 5 seconds for status to become 'device'
-        for _ in range(10):
-            res = subprocess.run([adb, "-s", target, "get-state"], capture_output=True, env=env, text=True)
-            if res.returncode == 0 and "device" in res.stdout.strip():
-                return
-            time.sleep(0.5)
-            # Retry connect in case it failed or wasn't tried
-            subprocess.run([adb, "connect", target], capture_output=True, env=env, timeout=5)
-
     def _start_server(self) -> None:
-        """Start scrcpy-server on the device."""
-        # We use the adb CLI to start the server in a way that we can keep it alive.
-        # We need to set ADB_VENDOR_KEYS so the CLI is authorized.
-        from .keystore import get_adb_key_paths
-        keys = get_adb_key_paths()
-        env = os.environ.copy()
-        env["ADB_VENDOR_KEYS"] = str(keys.private_key)
+        """Start scrcpy-server on the device synchronously in a background thread."""
+        from .adb_client import AdbTcpClient
         
-        adb = self._find_adb()
-        
-        # Ensure CLI is connected to the device
-        self._wait_for_device_cli(adb, env)
-
-        # Kill any existing scrcpy-server instances to avoid "Address already in use"
+        # Kill any existing scrcpy-server instances to avoid socket conflicts
         logger.info("Cleaning up any existing scrcpy-server instances on device...")
-        subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "pkill", "-f", "scrcpy-server"], capture_output=True, env=env, timeout=5)
-        # Also try killall just in case pkill isn't available
-        subprocess.run([adb, "-s", f"{self._host}:{self._port}", "shell", "killall", "scrcpy-server"], capture_output=True, env=env, timeout=5)
+        try:
+            self._adb.shell("pkill -f scrcpy-server")
+            self._adb.shell("pkill -f com.genymobile.scrcpy.Server")
+            self._adb.shell("killall scrcpy-server")
+        except Exception:
+            pass
         time.sleep(0.1)
 
-        # Arguments for v3.1: tunnel_forward=true means it listens on device abstract socket 'scrcpy'
-        # We don't background with '&' here; we use Popen to keep it alive as a child process.
-        server_cmd = [
-            adb, "-s", f"{self._host}:{self._port}", "shell",
-            f"CLASSPATH={self.DEVICE_SERVER_PATH}", "app_process", "/", "com.genymobile.scrcpy.Server",
-            self.SCRCPY_VERSION,
-            "tunnel_forward=true", "video=false", "audio=false", "control=true",
-            "cleanup=true", "power_off_on_close=false", "log_level=warn"
-        ]
+        # We establish a dedicated ADB connection just to keep the server running,
+        # perfectly mimicking the behavior of subprocess.Popen holding a cli adb shell.
+        logger.info("Establishing dedicated ADB connection to host scrcpy-server process...")
+        self._server_client = AdbTcpClient(self._host, port=self._port, timeout_s=5.0)
+        self._server_client.connect()
 
-        logger.info(f"Starting scrcpy-server on device: {' '.join(server_cmd)}")
-        self._shell_process = subprocess.Popen(
-            server_cmd,
-            env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
+        # The command runs synchronously in the shell. Closing the ADB stream terminates it.
+        server_cmd = (
+            f"CLASSPATH={self.DEVICE_SERVER_PATH} app_process / com.genymobile.scrcpy.Server "
+            f"{self.SCRCPY_VERSION} tunnel_forward=true video=false audio=false control=true "
+            f"clipboard_autosync=false cleanup=true power_off_on_close=false log_level=warn"
         )
+
+        def _server_worker(client: Any, cmd: str) -> None:
+            try:
+                # This will block as long as the server is running natively!
+                client.shell(cmd)
+                logger.info("Scrcpy server execution finished (shell channel closed).")
+            except Exception as e:
+                logger.debug(f"Scrcpy server thread exited: {e}")
+
+        logger.info("Starting scrcpy-server process in daemon thread...")
+        self._server_thread = threading.Thread(
+            target=_server_worker, 
+            args=(self._server_client, server_cmd), 
+            daemon=True
+        )
+        self._server_thread.start()
         
         # Give the server a moment to start and create its socket
-        # Give the server a moment to start and create its socket
-        # Increasing to 1.0s for stability on first launch / slow devices
         time.sleep(1.0)
-        
-        # Check if it crashed immediately
-        if self._shell_process.poll() is not None:
-            err = self._shell_process.stderr.read().decode() if self._shell_process.stderr else "Unknown error"
-            raise ScrcpyError(f"scrcpy-server exited immediately: {err}")
-            
         self._server_started = True
 
     def _setup_connection(self) -> None:
-        """Setup ADB forwarding and connect to control socket."""
-        # Find a free local port
-        self._forward_port = self._find_free_port()
+        """Setup independent ADB connection and connect to control socket."""
+        from .adb_client import AdbTcpClient
 
-        # Setup port forwarding using the adb CLI.
-        from .keystore import get_adb_key_paths
-        keys = get_adb_key_paths()
-        env = os.environ.copy()
-        env["ADB_VENDOR_KEYS"] = str(keys.private_key)
+        logger.info("Establishing dedicated ADB connection for scrcpy stream...")
+        self._scrcpy_client = AdbTcpClient(self._host, port=self._port, timeout_s=5.0)
         
-        adb = self._find_adb()
-        
-        # Setup the forward
-        result = subprocess.run([
-            adb, "-s", f"{self._host}:{self._port}",
-            "forward", f"tcp:{self._forward_port}", "localabstract:scrcpy"
-        ], capture_output=True, env=env, timeout=5)
-        
-        if result.returncode != 0:
-            raise ScrcpyError(f"Failed to setup port forward: {result.stderr.decode()}")
+        try:
+            self._scrcpy_client.connect()
+        except Exception as e:
+            raise ScrcpyError(f"Failed to create secondary scrcpy ADB connection: {e}")
+            
+        self._scrcpy_device = self._scrcpy_client._device
 
-        # Give forwarding a moment to establish
-        # minimal sleep
-        time.sleep(0.1)
-
-        # Connect to the forwarded port
-        self._control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._control_socket.settimeout(5.0)
-
-        # Retry connection a few times as server may take a moment
-        # Changed to polling: 30 attempts * 0.1s = 3.0s max wait (but much faster if ready)
+        # Try connecting to the abstract socket. Retry polling for 3 seconds.
         for attempt in range(30):
             try:
-                self._control_socket.connect(("127.0.0.1", self._forward_port))
+                # Open native ADB multiplexed stream to abstract socket
+                self._adb_info = self._scrcpy_device._open(
+                    b"localabstract:scrcpy", 
+                    transport_timeout_s=2.0, 
+                    read_timeout_s=2.0, 
+                    timeout_s=2.0
+                )
                 break
-            except (ConnectionRefusedError, socket.timeout):
+            except Exception as e:
+                # Let's catch any exceptions from adb_shell
                 if attempt < 29:
                     time.sleep(0.1)
                 else:
-                    raise ScrcpyError("Could not connect to scrcpy-server socket")
-
-        # Set socket to non-blocking for better responsiveness
-        self._control_socket.setblocking(False)
-        self._control_socket.settimeout(1.0)
+                    raise ScrcpyError(f"Could not open localabstract:scrcpy stream: {e}")
 
         # Read initial device info
         self._read_device_info()
 
     def _read_device_info(self) -> None:
         """Read initial device info from server."""
-        # scrcpy-server sends device name (64 bytes, null-padded)
-        if self._control_socket:
+        from adb_shell import constants
+        
+        if self._scrcpy_device and self._adb_info:
             try:
-                data = self._control_socket.recv(64)
-                if data:
-                    device_name = data.rstrip(b'\x00').decode('utf-8', errors='replace')
+                # The server automatically sends a 64 bytes device name across the control socket
+                old_timeout = self._adb_info.read_timeout_s
+                self._adb_info.read_timeout_s = 1.0  # Temporarily lower timeout
+                
+                cmd, data = self._scrcpy_device._read_until([constants.WRTE, constants.CLSE], self._adb_info)
+                
+                if cmd == constants.WRTE and data:
+                    device_name = data.rstrip(b'\\x00').decode('utf-8', errors='replace')
                     logger.info(f"Connected to device: {device_name}")
-            except socket.timeout:
-                # No initial data is OK for some server configurations
-                pass
+                
+                # Restore timeout
+                self._adb_info.read_timeout_s = old_timeout
             except Exception as e:
                 logger.debug(f"No device info received: {e}")
 
-    def _find_free_port(self) -> int:
-        """Find a free local port."""
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("127.0.0.1", 0))
-            return s.getsockname()[1]
+    def _scrcpy_send(self, payload: bytes) -> None:
+        """Send a raw byte payload to the scrcpy control socket directly via ADB WRTE."""
+        from adb_shell.adb_device import AdbMessage
+        from adb_shell import constants
+        
+        if not self._connected or not self._scrcpy_device or not self._adb_info:
+            return
 
-    def _run_adb_cmd(self, args: list) -> str:
-        """Deprecated, but kept for compatibility if needed."""
-        adb = self._find_adb()
-        cmd = [adb, "-s", f"{self._host}:{self._port}"] + args
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        return result.stdout
+        # Prepare WRTE packet
+        msg = AdbMessage(constants.WRTE, self._adb_info.local_id, self._adb_info.remote_id, payload)
+
+        try:
+            self._scrcpy_device._io_manager.send(msg, self._adb_info)
+            # Wait for OKAY acknowledgement
+            cmd, data = self._scrcpy_device._read_until([constants.OKAY, constants.CLSE], self._adb_info)
+            
+            if cmd == constants.CLSE:
+                raise ScrcpyConnectionError("Received CLSE from scrcpy stream while writing.")
+                
+        except Exception as e:
+            logger.error(f"Failed to send scrcpy packet: {e}")
+            self._connected = False
+            if self._on_disconnect:
+                self._on_disconnect()
 
     def send_keycode(self, keycode_name: str) -> None:
         """
@@ -474,9 +457,6 @@ class ScrcpyServerController:
 
     def _send_key_event(self, keycode: int, action: int) -> None:
         """Send a key event control message."""
-        if not self._connected or not self._control_socket:
-            return
-
         # Control message format for key event:
         # - type (1 byte): SC_CONTROL_MSG_TYPE_INJECT_KEYCODE = 0
         # - action (1 byte): AKEY_EVENT_ACTION_DOWN=0 or UP=1
@@ -491,14 +471,7 @@ class ScrcpyServerController:
             0,  # repeat
             0,  # metastate
         )
-
-        try:
-            self._control_socket.sendall(msg)
-        except Exception as e:
-            logger.error(f"Failed to send key event: {e}")
-            self._connected = False
-            if self._on_disconnect:
-                self._on_disconnect()
+        self._scrcpy_send(msg)
 
     def send_text(self, text: str) -> None:
         """
@@ -507,9 +480,6 @@ class ScrcpyServerController:
         Args:
             text: Text string to send
         """
-        if not self._connected or not self._control_socket:
-            return
-
         # Encode text as UTF-8
         text_bytes = text.encode("utf-8")
         text_len = len(text_bytes)
@@ -523,14 +493,7 @@ class ScrcpyServerController:
             SC_CONTROL_MSG_TYPE_INJECT_TEXT,
             text_len,
         ) + text_bytes
-
-        try:
-            self._control_socket.sendall(msg)
-        except Exception as e:
-            logger.error(f"Failed to send text: {e}")
-            self._connected = False
-            if self._on_disconnect:
-                self._on_disconnect()
+        self._scrcpy_send(msg)
 
     def expand_notification_panel(self) -> None:
         """
@@ -538,18 +501,7 @@ class ScrcpyServerController:
         
         This opens the notification/quick settings panel on Android TV.
         """
-        if not self._connected or not self._control_socket:
-            return
-
         # Control message format for expand notification panel:
         # - type (1 byte): SC_CONTROL_MSG_TYPE_EXPAND_NOTIFICATION_PANEL = 5
         msg = struct.pack(">B", SC_CONTROL_MSG_TYPE_EXPAND_NOTIFICATION_PANEL)
-
-        try:
-            self._control_socket.sendall(msg)
-        except Exception as e:
-            logger.error(f"Failed to expand notification panel: {e}")
-            self._connected = False
-            if self._on_disconnect:
-                self._on_disconnect()
-
+        self._scrcpy_send(msg)
