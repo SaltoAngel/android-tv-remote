@@ -279,6 +279,8 @@ class RemotePanel(Gtk.Box):
         self._keyboard_entry = Gtk.Entry(placeholder_text="Focus keyboard for text input")
         self._keyboard_entry.set_hexpand(True)
         self._keyboard_entry.set_editable(False)  # Read-only, but text is displayed and copyable
+        self._keyboard_entry.connect("icon-press", self._on_keyboard_entry_icon_press)
+        self._keyboard_entry.connect("changed", self._on_keyboard_entry_changed)
         self._keyboard_focused = False
         
         self._focus_keyboard_shortcut_text: str = "Tab"  # Default
@@ -494,10 +496,39 @@ class RemotePanel(Gtk.Box):
             self._status_spinner.stop()
             self._status_box.set_visible(False)
 
-    def update_device_info(self, info: DeviceInfo | None = None, ip: str | None = None) -> None:
+    def update_device_info(self, info: DeviceInfo | None = None, ip: str | None = None, current_app: str | None = None) -> None:
         if info and ip:
             self._title.set_title(GLib.markup_escape_text(f"{info.manufacturer} {info.model}"))
-            self._title.set_subtitle(GLib.markup_escape_text(f"Connected to {ip} (Android {info.version})"))
+            app_name = None
+            if current_app:
+                popular_apps = {
+                    "com.google.android.youtube.tv": "YouTube",
+                    "com.netflix.ninja": "Netflix",
+                    "com.amazon.amazonvideo.livingroom": "Prime Video",
+                    "com.amazon.amazonvideo": "Prime Video",
+                    "com.disney.disneyplus": "Disney+",
+                    "com.spotify.tv.android": "Spotify",
+                    "tv.twitch.android.app": "Twitch",
+                    "org.xbmc.kodi": "Kodi",
+                    "com.plexapp.android": "Plex",
+                    "com.teamsmart.videomanager.tv": "SmartTube",
+                    "com.liskovsoft.videomanager.tool": "SmartTube",
+                    "com.liskovsoft.smarttubetv.beta": "SmartTube Beta",
+                    "com.hbo.hbonow": "Max",
+                    "com.wbd.stream": "Max",
+                    "com.apple.atve.amazon.appletv": "Apple TV",
+                    "com.apple.atve.apple.appletv": "Apple TV",
+                    "com.crunchyroll.crunchyroid": "Crunchyroll",
+                    "tv.pluto.android": "Pluto TV",
+                    "com.google.android.tvlauncher": "Android TV Home",
+                    "com.google.android.tvrecommendations": "Android TV Home",
+                }
+                app_name = popular_apps.get(current_app) or current_app.split('.')[-1].replace('_', ' ').replace('-', ' ').title()
+            
+            if app_name:
+                self._title.set_subtitle(GLib.markup_escape_text(f"Connected to {ip} (Running {app_name})"))
+            else:
+                self._title.set_subtitle(GLib.markup_escape_text(f"Connected to {ip} (Android {info.version})"))
         else:
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
@@ -515,6 +546,19 @@ class RemotePanel(Gtk.Box):
         self._keyboard_entry.set_placeholder_text(f"Press {self._focus_keyboard_shortcut_text} to focus keyboard")
         # Clear the displayed text when leaving focus
         self._keyboard_entry.set_text("")
+
+    def _on_keyboard_entry_changed(self, entry: Gtk.Entry) -> None:
+        """Show clear icon only when there is text in the entry."""
+        text = entry.get_text()
+        if text:
+            entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, "edit-clear-symbolic")
+        else:
+            entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, None)
+
+    def _on_keyboard_entry_icon_press(self, entry: Gtk.Entry, icon_pos: Gtk.EntryIconPosition, _event) -> None:
+        """Handle clicking the clear icon."""
+        if icon_pos == Gtk.EntryIconPosition.SECONDARY:
+            entry.set_text("")
 
     def _append_entry_text(self, char: str) -> None:
         """Append a character to the entry text (read-only display)."""

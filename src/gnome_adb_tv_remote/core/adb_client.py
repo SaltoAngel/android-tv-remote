@@ -689,6 +689,21 @@ df -h /data | tail -1
             except Exception:
                 pass
 
+    def get_current_app(self) -> str | None:
+        """Get the package name of the app currently in the foreground."""
+        try:
+            import re
+            res = self.shell("dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'")
+            output = res.stdout
+            for line in output.split('\n'):
+                line = line.strip()
+                match = re.search(r'u0\s+([^/]+)/', line)
+                if match:
+                    return match.group(1).strip()
+        except Exception:
+            pass
+        return None
+
 
 
 

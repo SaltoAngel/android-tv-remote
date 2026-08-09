@@ -132,6 +132,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._volume_initialized: bool = False
         self._last_volume_change_time: float = 0.0
         self._volume_refresh_timeout_id: int | None = None  # For debounced volume refresh
+        self._device_info: DeviceInfo | None = None
         
         # Keyboard long-press state (for shortcuts)
         self._kb_long_press_timer_id: int | None = None
@@ -554,6 +555,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._remote_panel.set_sensitive(connected and scrcpy_ready)
         if not connected:
             self._volume_initialized = False
+            self._device_info = None
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
             if self._scrcpy:
@@ -645,6 +647,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_connect_success_ui(self, ip: str, client: AdbTcpClient, device_info: DeviceInfo) -> None:
         self._adb = client
+        self._device_info = device_info
         self._explicit_disconnect = False
         self._set_connected(True, ip=ip)
         self._remote_panel.update_device_info(device_info, ip)
@@ -1738,7 +1741,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._mpris_poll_timer_id = 0
     
     def _poll_media_info(self) -> bool:
-        """Fetch media info from device and update MPRIS.
+        """Fetch media info and foreground app from device.
         
         Returns True to continue polling, False to stop.
         """
@@ -1749,17 +1752,21 @@ class MainWindow(Adw.ApplicationWindow):
         def worker():
             try:
                 media_info = self._adb.get_media_session_info()
-                GLib.idle_add(self._on_media_info_fetched, media_info)
+                current_app = self._adb.get_current_app()
+                GLib.idle_add(self._on_media_info_fetched, media_info, current_app)
             except Exception as e:
-                logger.debug(f"Failed to fetch media info: {e}")
+                logger.debug(f"Failed to fetch media info/current app: {e}")
                 # Connection likely lost - trigger reconnection on main thread
                 GLib.idle_add(self._handle_connection_drop)
         
         threading.Thread(target=worker, daemon=True).start()
         return True  # Continue polling
     
-    def _on_media_info_fetched(self, media_info) -> None:
-        """Called when media info is fetched from device."""
+    def _on_media_info_fetched(self, media_info, current_app: str | None = None) -> None:
+        """Called when media info and current app are fetched from device."""
+        if self._adb and self._adb.connected and self._device_info:
+            self._remote_panel.update_device_info(self._device_info, self._connected_ip, current_app)
+
         if media_info:
             self._mpris.set_media_info(
                 title=media_info.title,
