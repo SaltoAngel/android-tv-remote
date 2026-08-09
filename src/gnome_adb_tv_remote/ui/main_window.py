@@ -1214,16 +1214,24 @@ class MainWindow(Adw.ApplicationWindow):
             logger.error(f"Failed to read clipboard: {e}")
 
     def _update_volume_slider(self) -> None:
-        """Fetch volume level from device and update the slider."""
+        """Fetch volume level from device and update the slider with automatic retries on timeout."""
         if not self._adb or not self._adb.connected:
             return
         
         def worker():
-            try:
-                current, max_vol, is_muted = self._adb.get_volume_level()
-                GLib.idle_add(self._on_volume_fetched, current, max_vol, is_muted)
-            except Exception as e:
-                logger.error(f"Failed to get volume level: {e}")
+            retries = 3
+            delay = 2.0  # seconds between retries
+            for attempt in range(1, retries + 1):
+                try:
+                    current, max_vol, is_muted = self._adb.get_volume_level()
+                    GLib.idle_add(self._on_volume_fetched, current, max_vol, is_muted)
+                    return  # Success, exit thread
+                except Exception as e:
+                    if attempt < retries:
+                        logger.warning(f"Failed to get volume level (attempt {attempt}/{retries}): {e}. Retrying in {delay}s...")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"Failed to get volume level after {retries} attempts: {e}")
         
         threading.Thread(target=worker, daemon=True).start()
 
