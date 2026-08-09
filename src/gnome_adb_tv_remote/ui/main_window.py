@@ -129,6 +129,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Track current volume for slider changes
         self._current_volume: int = 0
+        self._volume_initialized: bool = False
         self._last_volume_change_time: float = 0.0
         self._volume_refresh_timeout_id: int | None = None  # For debounced volume refresh
         
@@ -552,6 +553,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Only enable buttons when scrcpy is ready
         self._remote_panel.set_sensitive(connected and scrcpy_ready)
         if not connected:
+            self._volume_initialized = False
             self._remote_panel.update_device_info(None, None)
             # Cleanup scrcpy when disconnected
             if self._scrcpy:
@@ -1238,11 +1240,18 @@ class MainWindow(Adw.ApplicationWindow):
                         time.sleep(delay)
                     else:
                         logger.error(f"Failed to get volume level after {retries} attempts: {e}")
+                        GLib.idle_add(self._on_volume_fetch_failed)
         
         threading.Thread(target=worker, daemon=True).start()
 
+    def _on_volume_fetch_failed(self) -> None:
+        """Called when volume fetching fails after all retries."""
+        self._volume_initialized = False
+        self._remote_panel.set_volume_control_sensitive(False)
+
     def _on_volume_fetched(self, current: int, max_vol: int, is_muted: bool) -> None:
         """Called when volume level is fetched from device."""
+        self._volume_initialized = True
         # Skip updating if user recently changed volume (within 1 second)
         # This prevents the slider from jumping back to old values
         if time.time() - self._last_volume_change_time < 1.0:
@@ -1261,6 +1270,10 @@ class MainWindow(Adw.ApplicationWindow):
         Since Android doesn't have a direct "set volume" command via scrcpy,
         we send VOLUME_UP or VOLUME_DOWN events to adjust the volume.
         """
+        if not self._volume_initialized:
+            self._toast("Volume sync in progress...")
+            return
+
         scrcpy = self._scrcpy
         if not scrcpy or not scrcpy.connected:
             return

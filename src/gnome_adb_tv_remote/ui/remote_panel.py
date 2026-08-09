@@ -1207,6 +1207,15 @@ class RemotePanel(Gtk.Box):
         # Update mute button icon based on muted state
         self._update_mute_button_icon()
 
+    def set_volume_control_sensitive(self, sensitive: bool) -> None:
+        """Enable or disable all volume controls."""
+        if self._volume_slider:
+            self._volume_slider.set_sensitive(sensitive)
+        if self._volume_percent_btn:
+            self._volume_percent_btn.set_sensitive(sensitive)
+        if self._mute_button:
+            self._mute_button.set_sensitive(sensitive)
+
     def _update_volume_label(self, current: int, max_vol: int) -> None:
         """Update the volume percentage button text."""
         if self._volume_percent_btn:
