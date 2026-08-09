@@ -79,6 +79,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._device_has_input_support: bool = True  # Whether connected device has native TV Input support
         self._input_device_dialog: InputDeviceDialog | None = None
         self._pending_tv_remote_dialog_ip: str | None = None  # IP to open TV remote dialog for after connection
+        self._explicit_disconnect: bool = False
+        self._reconnect_timer_id: int | None = None
         
         # Initialize MPRIS service for desktop media control integration
         self._mpris = MprisService(
@@ -591,6 +593,11 @@ class MainWindow(Adw.ApplicationWindow):
         if not ip:
             return
 
+        # Cancel any active reconnect timer
+        if self._reconnect_timer_id is not None:
+            GLib.source_remove(self._reconnect_timer_id)
+            self._reconnect_timer_id = None
+
         if self._connect_thread:
             if not silent:
                 self._toast("Already connecting…")
@@ -636,6 +643,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_connect_success_ui(self, ip: str, client: AdbTcpClient, device_info: DeviceInfo) -> None:
         self._adb = client
+        self._explicit_disconnect = False
         self._set_connected(True, ip=ip)
         self._remote_panel.update_device_info(device_info, ip)
         self._save_last_device(ip, device_info)
@@ -645,6 +653,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Start scrcpy in background for low-latency input
         self._start_scrcpy_async(ip)
+
 
 
     def _start_scrcpy_async(self, ip: str) -> None:
@@ -757,12 +766,40 @@ class MainWindow(Adw.ApplicationWindow):
         """Called when scrcpy disconnects unexpectedly."""
         self._scrcpy = None
         logger.info("scrcpy disconnected")
+        if not self._explicit_disconnect:
+            self._set_connected(False)
+            self._schedule_auto_reconnect()
 
     def _on_connect_failed_ui(self, msg: str) -> None:
         self._adb = None
         self._set_connected(False)
         self._remote_panel.set_connection_status(None)  # Hide status on failure
         self._toast(msg)
+        if not self._explicit_disconnect:
+            self._schedule_auto_reconnect()
+
+    def _schedule_auto_reconnect(self) -> None:
+        if self._reconnect_timer_id is not None:
+            return
+
+        last_ip = self._settings.get_string("last-connected-ip")
+        if not last_ip:
+            return
+
+        logger.info(f"Scheduling auto-reconnect to {last_ip} in 5 seconds...")
+        self._reconnect_timer_id = GLib.timeout_add_seconds(5, self._auto_reconnect_cb, last_ip)
+
+    def _auto_reconnect_cb(self, ip: str) -> bool:
+        self._reconnect_timer_id = None
+        if self._explicit_disconnect or self._adb:
+            return False
+
+        logger.info(f"Attempting auto-reconnect to {ip}...")
+        self._remote_panel.set_connection_status("Reconnecting…")
+        self._connect_ip(ip, silent=True)
+        return False
+
+
 
     def _on_connect_done_ui(self) -> None:
         self._connect_thread = None
@@ -771,6 +808,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self._connect_thread:
             self._toast("Still connecting…")
             return
+        self._explicit_disconnect = True
+        # Cancel any active reconnect timer
+        if self._reconnect_timer_id is not None:
+            GLib.source_remove(self._reconnect_timer_id)
+            self._reconnect_timer_id = None
         # Cancel any pending volume refresh
         if self._volume_refresh_timeout_id is not None:
             GLib.source_remove(self._volume_refresh_timeout_id)
@@ -808,6 +850,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Update MPRIS to reflect disconnection
         self._mpris.set_device_connected(False)
         self._toast("Disconnected from device.")
+
 
     def _on_key_pressed(self, _controller: Gtk.EventControllerKey, keyval: int, _keycode: int, _state: Gdk.ModifierType) -> bool:
         """Handle global keyboard shortcuts with long-press support.

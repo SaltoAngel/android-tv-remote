@@ -121,7 +121,6 @@ button.remote-button label.caption {
     font-size: 0.8em;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .now-playing-icon {
@@ -133,13 +132,10 @@ button.remote-button label.caption {
     margin-right: 4px;
 }
 
-.input-button-dimmed {
-    opacity: 0.5;
-}
-
 .input-button-dimmed:hover {
     opacity: 0.7;
 }
+
 """
 
 
@@ -222,10 +218,8 @@ class RemotePanel(Gtk.Box):
         
         # Volume slider components
         self._volume_slider: Gtk.Scale | None = None
+        self._volume_percent_btn: Gtk.Button | None = None
         self._mute_button: Gtk.Button | None = None
-        self._volume_max: int = 15  # Will be updated from device
-        self._on_volume_change = None  # Callback for volume changes
-        self._updating_slider = False  # Prevent feedback loops
         self._volume_max: int = 15  # Will be updated from device
         self._on_volume_change = None  # Callback for volume changes
         self._updating_slider = False  # Prevent feedback loops
@@ -290,6 +284,38 @@ class RemotePanel(Gtk.Box):
         self._keyboard_entry.add_controller(focus_controller)
         
         self.append(self._keyboard_entry)
+
+        # Horizontal box for color buttons (Red, Green, Yellow, Blue)
+        self._color_buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self._color_buttons_box.set_homogeneous(True)
+        self._color_buttons_box.set_hexpand(True)
+        self._color_buttons_box.set_margin_top(8)
+        self._color_buttons_box.set_margin_bottom(8)
+        colors = [
+            ("Red", "KEYCODE_PROG_RED", "#e74c3c"),
+            ("Green", "KEYCODE_PROG_GREEN", "#2ecc71"),
+            ("Yellow", "KEYCODE_PROG_YELLOW", "#f1c40f"),
+            ("Blue", "KEYCODE_PROG_BLUE", "#3498db"),
+        ]
+        for name, keycode, hex_color in colors:
+            btn = Gtk.Button()
+            btn.add_css_class("remote-button")
+            btn.set_tooltip_text(name)
+            btn.connect("clicked", lambda *_, k=keycode: self._on_keyevent(k) if self._on_keyevent else None)
+
+            # Create a small color dot as child using a label with Pango markup for color
+            dot = Gtk.Label()
+            dot.set_markup(f'<span foreground="{hex_color}" size="x-large">●</span>')
+            dot.set_halign(Gtk.Align.CENTER)
+            dot.set_valign(Gtk.Align.CENTER)
+            btn.set_child(dot)
+
+            # Register button for flash feedback
+            self._keycode_buttons[keycode] = btn
+
+            self._color_buttons_box.append(btn)
+
+        self.append(self._color_buttons_box)
         
         # Media Controls Section (now playing bar + player/volume controls at bottom)
         self._create_media_controls_section()
@@ -463,6 +489,7 @@ class RemotePanel(Gtk.Box):
         else:
             self._title.set_title("Remote")
             self._title.set_subtitle("Connect to a device to enable controls")
+
 
 
     def _on_keyboard_focus_enter(self, *_args) -> None:
@@ -985,17 +1012,23 @@ class RemotePanel(Gtk.Box):
         controls_row.add_css_class("volume-slider-box")
         controls_row.set_hexpand(True)
         
-        # Left side: Prev, Play/Pause, Next buttons
+        # Left side: Prev, Rewind, Play/Pause, Fast Forward, Next buttons
         prev_btn = self._create_media_button("Prev", "KEYCODE_MEDIA_PREVIOUS", "media-skip-backward-symbolic")
         controls_row.append(prev_btn)
-        
+
+        rew_btn = self._create_media_button("Rewind", "KEYCODE_MEDIA_REWIND", "media-seek-backward-symbolic")
+        controls_row.append(rew_btn)
+
         # Play/Pause button - starts with play icon, will be updated based on playback status
         play_btn = self._create_media_button("Play/Pause", "KEYCODE_MEDIA_PLAY_PAUSE", "media-playback-start-symbolic")
         self._play_pause_button = play_btn
         # Store reference to the icon for dynamic updates
         self._play_pause_icon = play_btn.get_child()
         controls_row.append(play_btn)
-        
+
+        ff_btn = self._create_media_button("Fast Forward", "KEYCODE_MEDIA_FAST_FORWARD", "media-seek-forward-symbolic")
+        controls_row.append(ff_btn)
+
         next_btn = self._create_media_button("Next", "KEYCODE_MEDIA_NEXT", "media-skip-forward-symbolic")
         controls_row.append(next_btn)
         
@@ -1016,6 +1049,14 @@ class RemotePanel(Gtk.Box):
         
         controls_row.append(slider)
         self._volume_slider = slider
+
+        # Volume percentage button/label
+        self._volume_percent_btn = Gtk.Button(label="--%")
+        self._volume_percent_btn.add_css_class("flat")
+        self._volume_percent_btn.set_sensitive(False)  # Disable until real volume is fetched
+        self._volume_percent_btn.set_tooltip_text("Set volume percentage directly")
+        self._volume_percent_btn.connect("clicked", self._on_volume_percent_clicked)
+        controls_row.append(self._volume_percent_btn)
         
         # Right side: Mute button
         mute_btn = Gtk.Button()
@@ -1073,6 +1114,11 @@ class RemotePanel(Gtk.Box):
         
         new_value = int(slider.get_value())
         
+        # Update percent button label
+        adjustment = slider.get_adjustment()
+        max_vol = int(adjustment.get_upper())
+        self._update_volume_label(new_value, max_vol)
+
         # Unmute when volume is adjusted
         if self._is_muted:
             self._is_muted = False
@@ -1138,12 +1184,92 @@ class RemotePanel(Gtk.Box):
             self._volume_slider.set_sensitive(True)  # Enable slider after fetching real volume
             self._updating_slider = False
         
+        if self._volume_percent_btn:
+            self._volume_percent_btn.set_sensitive(True)
+        self._update_volume_label(current, max_vol)
+        
         # Enable mute button after volume is fetched
         if self._mute_button:
             self._mute_button.set_sensitive(True)
         
         # Update mute button icon based on muted state
         self._update_mute_button_icon()
+
+    def _update_volume_label(self, current: int, max_vol: int) -> None:
+        """Update the volume percentage button text."""
+        if self._volume_percent_btn:
+            if max_vol > 0:
+                pct = int((current / max_vol) * 100)
+                self._volume_percent_btn.set_label(f"{pct}%")
+            else:
+                self._volume_percent_btn.set_label("0%")
+
+    def _on_volume_percent_clicked(self, btn: Gtk.Button) -> None:
+        """Open a popover to enter volume percentage directly."""
+        popover = Gtk.Popover()
+        popover.set_parent(btn)
+        
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        box.set_margin_top(6)
+        box.set_margin_bottom(6)
+        box.set_margin_start(6)
+        box.set_margin_end(6)
+        
+        entry = Gtk.Entry()
+        entry.set_placeholder_text("0-100")
+        entry.set_width_chars(6)
+        
+        # Pre-fill with current percentage
+        adjustment = self._volume_slider.get_adjustment() if self._volume_slider else None
+        val = adjustment.get_value() if adjustment else 7
+        mx = self._volume_max or 15
+        current_pct = int((val / mx) * 100)
+        entry.set_text(f"{current_pct}")
+        
+        # Real-time digit validation and 0-100 clamping
+        def on_entry_changed(entry_widget):
+            text = entry_widget.get_text()
+            digits = "".join([c for c in text if c.isdigit()])
+            if digits:
+                val_int = int(digits)
+                if val_int > 100:
+                    digits = "100"
+                if text != digits:
+                    GLib.idle_add(entry_widget.set_text, digits)
+            else:
+                if text != "":
+                    GLib.idle_add(entry_widget.set_text, "")
+                    
+        entry.connect("changed", on_entry_changed)
+        
+        set_btn = Gtk.Button(label="Set")
+        set_btn.add_css_class("suggested-action")
+        
+        def apply_pct():
+            text = entry.get_text().strip()
+            try:
+                pct = int(text)
+                if 0 <= pct <= 100:
+                    new_val = round((pct / 100.0) * mx)
+                    new_val = max(0, min(int(mx), new_val))
+                    
+                    if self._is_muted:
+                        self._is_muted = False
+                        self._update_mute_button_icon()
+                    
+                    if self._volume_slider:
+                        self._volume_slider.set_value(new_val)
+                    popover.popdown()
+            except ValueError:
+                pass
+                
+        entry.connect("activate", lambda _: apply_pct())
+        set_btn.connect("clicked", lambda _: apply_pct())
+        
+        box.append(entry)
+        box.append(set_btn)
+        popover.set_child(box)
+        popover.popup()
 
     def _update_mute_button_icon(self) -> None:
         """Update the mute button icon based on current muted state."""
