@@ -782,12 +782,18 @@ class MainWindow(Adw.ApplicationWindow):
         if self._reconnect_timer_id is not None:
             return
 
+        # Check if auto-reconnect is enabled in settings
+        if not self._settings.get_boolean("auto-reconnect"):
+            logger.info("Auto-reconnect is disabled in settings.")
+            return
+
         last_ip = self._settings.get_string("last-connected-ip")
         if not last_ip:
             return
 
-        logger.info(f"Scheduling auto-reconnect to {last_ip} in 5 seconds...")
-        self._reconnect_timer_id = GLib.timeout_add_seconds(5, self._auto_reconnect_cb, last_ip)
+        interval = max(1, self._settings.get_int("reconnect-interval"))
+        logger.info(f"Scheduling auto-reconnect to {last_ip} in {interval} seconds...")
+        self._reconnect_timer_id = GLib.timeout_add_seconds(interval, self._auto_reconnect_cb, last_ip)
 
     def _auto_reconnect_cb(self, ip: str) -> bool:
         self._reconnect_timer_id = None

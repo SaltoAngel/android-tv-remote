@@ -53,6 +53,16 @@
       <summary>TV device model</summary>
       <description>The model name of the TV device for Input button routing. Used for verification during auto-connect.</description>
     </key>
+    <key name="auto-reconnect" type="b">
+      <default>true</default>
+      <summary>Enable auto-reconnection</summary>
+      <description>Automatically attempt to reconnect when the connection is lost.</description>
+    </key>
+    <key name="reconnect-interval" type="i">
+      <default>5</default>
+      <summary>Reconnection interval in seconds</summary>
+      <description>Time to wait between reconnection attempts.</description>
+    </key>
   </schema>
 </schemalist>
 

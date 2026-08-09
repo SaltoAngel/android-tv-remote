@@ -17,7 +17,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Adw", "1")
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, GObject  # noqa: E402
 
 
 # Default keyboard shortcuts mapping: action -> list of Gdk key names
@@ -364,6 +364,40 @@ class PreferencesDialog(Adw.Dialog):
         tv_ip_entry.connect("changed", on_tv_ip_changed)
         tv_ip_row.add_suffix(tv_ip_entry)
         tv_ip_group.add(tv_ip_row)
+
+        # Connection Settings Group
+        connection_group = Adw.PreferencesGroup(title="Connection")
+        content.append(connection_group)
+        
+        # Auto-reconnect switch row
+        reconnect_row = Adw.ActionRow(title="Auto-reconnect")
+        reconnect_row.set_subtitle("Automatically reconnect when connection is lost")
+        reconnect_switch = Gtk.Switch()
+        reconnect_switch.set_valign(Gtk.Align.CENTER)
+        
+        # Bind setting to switch
+        self._settings.bind("auto-reconnect", reconnect_switch, "active", Gio.SettingsBindFlags.DEFAULT)
+        
+        reconnect_row.add_suffix(reconnect_switch)
+        connection_group.add(reconnect_row)
+        
+        # Reconnect interval row (Gtk.SpinButton)
+        interval_row = Adw.ActionRow(title="Reconnection Interval")
+        interval_row.set_subtitle("Time to wait between reconnection attempts (seconds)")
+        
+        interval_adjustment = Gtk.Adjustment(value=5, lower=1, upper=60, step_increment=1, page_increment=5)
+        interval_spin = Gtk.SpinButton(adjustment=interval_adjustment)
+        interval_spin.set_valign(Gtk.Align.CENTER)
+        
+        # Bind setting to spinbutton
+        self._settings.bind("reconnect-interval", interval_spin, "value", Gio.SettingsBindFlags.DEFAULT)
+        
+        # Make interval row sensitive only if auto-reconnect is active
+        reconnect_switch.bind_property("active", interval_row, "sensitive", GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE)
+        reconnect_switch.bind_property("active", interval_spin, "sensitive", GObject.BindingFlags.DEFAULT | GObject.BindingFlags.SYNC_CREATE)
+        
+        interval_row.add_suffix(interval_spin)
+        connection_group.add(interval_row)
 
         # Create preference groups for each category
         for category, actions in ACTION_CATEGORIES.items():

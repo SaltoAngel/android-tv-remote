@@ -157,6 +157,12 @@ KEYCODE_TO_ACTION: dict[str, str] = {
     "KEYCODE_ASSIST": "assistant",
     "KEYCODE_CAPTIONS": "captions",
     "KEYCODE_TV_INPUT": "tv-input",
+    "KEYCODE_MEDIA_REWIND": "rewind",
+    "KEYCODE_MEDIA_FAST_FORWARD": "fast-forward",
+    "KEYCODE_PROG_RED": "color-red",
+    "KEYCODE_PROG_GREEN": "color-green",
+    "KEYCODE_PROG_YELLOW": "color-yellow",
+    "KEYCODE_PROG_BLUE": "color-blue",
 }
 
 
@@ -407,6 +413,12 @@ class RemotePanel(Gtk.Box):
                         "previous": "Prev",
                         "play-pause": "Play/Pause",
                         "next": "Next",
+                        "rewind": "Rewind",
+                        "fast-forward": "Fast Forward",
+                        "color-red": "Red Button",
+                        "color-green": "Green Button",
+                        "color-yellow": "Yellow Button",
+                        "color-blue": "Blue Button",
                     }
                     action_name = action_names.get(action, action.replace("-", " ").title())
                     btn.set_tooltip_text(f"{action_name}: {shortcut_text}")
@@ -1209,11 +1221,28 @@ class RemotePanel(Gtk.Box):
         popover = Gtk.Popover()
         popover.set_parent(btn)
         
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        vbox.set_margin_top(6)
+        vbox.set_margin_bottom(6)
+        vbox.set_margin_start(6)
+        vbox.set_margin_end(6)
+
+        if self._is_muted:
+            mute_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            mute_box.set_halign(Gtk.Align.CENTER)
+            
+            mute_icon = Gtk.Image.new_from_icon_name("audio-volume-muted-symbolic")
+            mute_icon.set_pixel_size(16)
+            mute_box.append(mute_icon)
+            
+            mute_lbl = Gtk.Label(label="Muted")
+            mute_lbl.add_css_class("dim-label")
+            mute_lbl.add_css_class("error")
+            mute_box.append(mute_lbl)
+            
+            vbox.append(mute_box)
+
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        box.set_margin_top(6)
-        box.set_margin_bottom(6)
-        box.set_margin_start(6)
-        box.set_margin_end(6)
         
         entry = Gtk.Entry()
         entry.set_placeholder_text("0-100")
@@ -1268,7 +1297,8 @@ class RemotePanel(Gtk.Box):
         
         box.append(entry)
         box.append(set_btn)
-        popover.set_child(box)
+        vbox.append(box)
+        popover.set_child(vbox)
         popover.popup()
 
     def _update_mute_button_icon(self) -> None:
