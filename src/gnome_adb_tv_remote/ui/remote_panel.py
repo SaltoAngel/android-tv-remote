@@ -558,7 +558,14 @@ class RemotePanel(Gtk.Box):
     def _on_keyboard_entry_icon_press(self, entry: Gtk.Entry, icon_pos: Gtk.EntryIconPosition) -> None:
         """Handle clicking the clear icon."""
         if icon_pos == Gtk.EntryIconPosition.SECONDARY:
+            text = entry.get_text()
+            length = len(text)
             entry.set_text("")
+            
+            # Send backspace events to TV for each character in the text
+            if length > 0 and hasattr(self, "_on_keyevent") and self._on_keyevent:
+                for _ in range(length):
+                    self._on_keyevent("KEYCODE_DEL")
 
     def _append_entry_text(self, char: str) -> None:
         """Append a character to the entry text (read-only display)."""
