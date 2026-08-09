@@ -303,7 +303,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         self._connect_silent = True
         self._remote_panel.set_connection_status("Connecting…")
-        client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
+        client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
         
         # Get expected device model from settings
         expected_model = self._settings.get_string("last-connected-device-model") or None
@@ -616,7 +616,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._toast(f"Connecting to {ip}:5555…")
         self._connect_silent = silent
         self._remote_panel.set_connection_status("Connecting…")
-        client = AdbTcpClient(ip, port=5555, timeout_s=8.0)
+        client = AdbTcpClient(ip, port=5555, timeout_s=3.0)
 
         def worker() -> None:
             try:
@@ -1317,7 +1317,7 @@ class MainWindow(Adw.ApplicationWindow):
         def worker():
             try:
                 # Create ADB client for TV device
-                tv_client = AdbTcpClient(tv_ip, port=5555, timeout_s=8.0)
+                tv_client = AdbTcpClient(tv_ip, port=5555, timeout_s=3.0)
                 tv_client.connect()
                 
                 # Get device info for display in dialog
