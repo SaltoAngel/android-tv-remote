@@ -555,7 +555,7 @@ class RemotePanel(Gtk.Box):
         else:
             entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, None)
 
-    def _on_keyboard_entry_icon_press(self, entry: Gtk.Entry, icon_pos: Gtk.EntryIconPosition, _event) -> None:
+    def _on_keyboard_entry_icon_press(self, entry: Gtk.Entry, icon_pos: Gtk.EntryIconPosition) -> None:
         """Handle clicking the clear icon."""
         if icon_pos == Gtk.EntryIconPosition.SECONDARY:
             entry.set_text("")
